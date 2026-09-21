@@ -26,6 +26,8 @@ export default function StudentPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [recordChoice, setRecordChoice] = useState(null);
   const [note, setNote] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const [toast, setToast] = useState('');
   const [openDay, setOpenDay] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +62,13 @@ export default function StudentPage() {
     router.replace('/');
   }
 
+  function handlePhotoChange(e) {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setPhotoFile(f);
+    setPhotoPreview(URL.createObjectURL(f));
+  }
+
   async function submitEvidence() {
     if (recordChoice === null || !student) return;
     setSubmitting(true);
@@ -68,19 +77,38 @@ export default function StudentPage() {
     const dayNumber = student.current_day || 1;
     const actionText = ch.actions[recordChoice];
 
-    const { error } = await supabase.from('daily_actions').insert({
-      student_id: session.user.id,
-      challenge_id: challengeId,
-      day_number: dayNumber,
-      action_text: actionText,
-      note: note || null,
-      status: 'done',
-    });
+    const { data: actionRow, error } = await supabase
+      .from('daily_actions')
+      .insert({
+        student_id: session.user.id,
+        challenge_id: challengeId,
+        day_number: dayNumber,
+        action_text: actionText,
+        note: note || null,
+        status: 'done',
+      })
+      .select()
+      .single();
 
     if (error) {
       showToast('Có lỗi khi gửi minh chứng: ' + error.message);
       setSubmitting(false);
       return;
+    }
+
+    // Tải ảnh minh chứng thật lên Supabase Storage (bucket "evidence"), nếu có chọn ảnh
+    if (photoFile && actionRow) {
+      const ext = photoFile.name.split('.').pop() || 'jpg';
+      const filePath = `${session.user.id}/day-${dayNumber}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('evidence').upload(filePath, photoFile);
+      if (!uploadError) {
+        await supabase.from('evidence').insert({
+          daily_action_id: actionRow.id,
+          file_path: filePath,
+        });
+      } else {
+        showToast('Đã ghi nhận hành động, nhưng lỗi khi tải ảnh: ' + uploadError.message);
+      }
     }
 
     const newStreak = (student.streak || 0) + 1;
@@ -104,6 +132,8 @@ export default function StudentPage() {
     setModalOpen(false);
     setRecordChoice(null);
     setNote('');
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setSubmitting(false);
     await loadAll(session.user.id);
     showToast(earnedBadge ? `Chúc mừng! Bạn vừa đạt huy hiệu "${earnedBadge.name}"` : 'Ngày hôm nay đã được ghi nhận!');
@@ -196,7 +226,10 @@ export default function StudentPage() {
       {modalOpen && (
         <RecordModal
           ch={ch} dayNumber={student.current_day} recordChoice={recordChoice} setRecordChoice={setRecordChoice}
-          note={note} setNote={setNote} onClose={() => setModalOpen(false)} onSubmit={submitEvidence} submitting={submitting}
+          note={note} setNote={setNote}
+          photoPreview={photoPreview} onPhotoChange={handlePhotoChange}
+          onClose={() => { setModalOpen(false); setPhotoFile(null); setPhotoPreview(null); }}
+          onSubmit={submitEvidence} submitting={submitting}
         />
       )}
 
@@ -475,7 +508,7 @@ function ProfileTab({ profile, student, onLogout }) {
   );
 }
 
-function RecordModal({ ch, dayNumber, recordChoice, setRecordChoice, note, setNote, onClose, onSubmit, submitting }) {
+function RecordModal({ ch, dayNumber, recordChoice, setRecordChoice, note, setNote, photoPreview, onPhotoChange, onClose, onSubmit, submitting }) {
   return (
     <div className="fixed inset-0 z-50 bg-forest-900/55 flex items-end sm:items-center justify-center backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[88vh] overflow-auto">
@@ -497,11 +530,15 @@ function RecordModal({ ch, dayNumber, recordChoice, setRecordChoice, note, setNo
           ))}
         </div>
         <div className="mb-3.5">
-          <label className="block text-xs font-bold mb-1.5">Ảnh minh chứng</label>
-          <div className="border border-dashed border-sand-100 rounded-xl p-5 text-center text-ink-600 text-xs bg-sand-50">
-            📷 Chạm để chụp ảnh hoặc tải ảnh lên<br />
-            <span className="text-[10px] text-ink-400">(Kết nối Supabase Storage bucket "evidence" để lưu ảnh thật)</span>
-          </div>
+          <label className="block text-xs font-bold mb-1.5">Ảnh minh chứng (không bắt buộc)</label>
+          <label className="border border-dashed border-sand-100 rounded-xl p-4 text-center text-ink-600 text-xs bg-sand-50 block cursor-pointer">
+            {photoPreview ? (
+              <img src={photoPreview} alt="Xem trước ảnh minh chứng" className="mx-auto max-h-36 rounded-lg mb-1.5 object-cover" />
+            ) : (
+              <div className="py-2">📷 Chạm để chụp ảnh hoặc tải ảnh lên</div>
+            )}
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhotoChange} />
+          </label>
         </div>
         <div className="mb-4">
           <label className="block text-xs font-bold mb-1.5">Ghi chú (không bắt buộc)</label>
