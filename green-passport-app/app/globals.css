@@ -1,19 +1,43 @@
+/* @import phải nằm trên cùng file CSS thì trình duyệt mới nạp font */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
 
-html, body {
-  height: 100%;
-  background-color: #F3F6F1;
-  color: #132318;
-  font-family: 'Inter', system-ui, sans-serif;
-}
+  body {
+    background-color: #F4FAF5;
+    background-image:
+      radial-gradient(720px 420px at 88% -8%, rgba(15,169,104,.12), transparent 60%),
+      radial-gradient(600px 360px at -8% 18%, rgba(126,211,174,.16), transparent 55%),
+      linear-gradient(180deg, #EAF7EE 0%, #F4FAF5 340px, #F4FAF5 100%);
+    background-attachment: fixed;
+    color: #0F2A1D;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-h1, h2, h3, .font-display {
-  font-family: 'Sora', system-ui, sans-serif;
+  /* Viền focus 2 lớp: nhìn rõ cả trên nền tối (header, thẻ Passport) lẫn nền sáng */
+  :focus-visible {
+    outline: 2px solid #3AA68A;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px #fff;
+  }
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #C9D8C9; border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
