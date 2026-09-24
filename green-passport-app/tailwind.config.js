@@ -33,6 +33,23 @@ module.exports = {
           700: "#0A7F52",
           soft: "#E4F7EC",
         },
+        // --- Bảng màu bổ sung: các trang dùng forest-*, leaf-*, sand-* nhưng trước đây chưa được định nghĩa ---
+        forest: {
+          600: "#2C7A64",
+          700: "#23594A",
+          800: "#1D4A3E",
+          900: "#123328",
+        },
+        leaf: {
+          100: "#DCF3EA",
+          400: "#6FD0A8",
+          500: "#2AA37C",
+          600: "#1E8A67",
+        },
+        sand: {
+          50: "#F5F9F6",
+          100: "#E5EEE9",
+        },
         mint: {
           50: "#EAF6EF",
           100: "#D2EFDD",
@@ -47,6 +64,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['"Be Vietnam Pro"', '"Segoe UI"', "system-ui", "sans-serif"],
+        display: ['"Be Vietnam Pro"', '"Segoe UI"', "system-ui", "sans-serif"],
       },
       boxShadow: {
         soft: "0 10px 26px -10px rgba(17,59,37,.14), 0 2px 6px rgba(17,59,37,.05)",
