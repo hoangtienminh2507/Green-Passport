@@ -42,7 +42,18 @@ export default function TeacherPage() {
       .select('*')
       .eq('status', 'done')
       .order('created_at', { ascending: false });
-    const pending = (actions || []).map((a) => ({ ...a, full_name: userMap[a.student_id]?.full_name || '(chưa rõ tên)' }));
+
+    const actionIds = (actions || []).map((a) => a.id);
+    let evidenceMap = {};
+    if (actionIds.length > 0) {
+      const { data: evidenceRows } = await supabase.from('evidence').select('*').in('daily_action_id', actionIds);
+      (evidenceRows || []).forEach((e) => { evidenceMap[e.daily_action_id] = e.file_path; });
+    }
+    const pending = (actions || []).map((a) => ({
+      ...a,
+      full_name: userMap[a.student_id]?.full_name || '(chưa rõ tên)',
+      photo_path: evidenceMap[a.id] || null,
+    }));
     setPendingActions(pending);
   }, []);
 
@@ -72,7 +83,13 @@ export default function TeacherPage() {
       .eq('student_id', s.id)
       .order('day_number', { ascending: false })
       .limit(10);
-    setStudentActions(data || []);
+    const actionIds = (data || []).map((a) => a.id);
+    let evidenceMap = {};
+    if (actionIds.length > 0) {
+      const { data: evidenceRows } = await supabase.from('evidence').select('*').in('daily_action_id', actionIds);
+      (evidenceRows || []).forEach((e) => { evidenceMap[e.daily_action_id] = e.file_path; });
+    }
+    setStudentActions((data || []).map((a) => ({ ...a, photo_path: evidenceMap[a.id] || null })));
   }
 
   async function confirmAction(actionId) {
@@ -183,6 +200,24 @@ export default function TeacherPage() {
 
 /* ---------------- Sub views ---------------- */
 
+function getPhotoUrl(filePath) {
+  if (!filePath) return null;
+  const { data } = supabase.storage.from('evidence').getPublicUrl(filePath);
+  return data?.publicUrl || null;
+}
+
+function EvidenceThumb({ photoPath, fallbackIcon }) {
+  const url = getPhotoUrl(photoPath);
+  if (!url) {
+    return <div className="w-11 h-11 rounded-lg flex items-center justify-center bg-leaf-100 text-lg flex-none">{fallbackIcon}</div>;
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="flex-none">
+      <img src={url} alt="Ảnh minh chứng" className="w-11 h-11 rounded-lg object-cover border border-sand-100" />
+    </a>
+  );
+}
+
 function SectionTitle({ text }) {
   return <h2 className="font-display font-bold text-xl mb-1">{text}</h2>;
 }
@@ -203,7 +238,7 @@ function DashboardTab({ kpi, pendingActions, onGotoEvidence }) {
         {pendingActions.length === 0 && <div className="text-xs text-ink-600">Không có minh chứng nào đang chờ 🎉</div>}
         {pendingActions.slice(0, 5).map((a) => (
           <div key={a.id} className="flex items-center gap-3 py-2.5 border-b border-sand-100 last:border-0">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-leaf-100 text-lg flex-none">{CHALLENGES[a.challenge_id]?.icon || '🌱'}</div>
+            <EvidenceThumb photoPath={a.photo_path} fallbackIcon={CHALLENGES[a.challenge_id]?.icon || '🌱'} />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold truncate">{a.full_name}</div>
               <div className="text-[11px] text-ink-600">Ngày {a.day_number} · {CHALLENGES[a.challenge_id]?.name}</div>
@@ -273,6 +308,7 @@ function StudentDetail({ student, actions, onBack, onConfirm, onRequestMore }) {
         {actions.length === 0 && <div className="p-4 text-sm text-ink-600">Chưa có hành động nào được ghi nhận.</div>}
         {actions.map((a) => (
           <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b border-sand-100 last:border-0">
+            <EvidenceThumb photoPath={a.photo_path} fallbackIcon={ch.icon} />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold">Ngày {a.day_number} · {a.action_text}</div>
               {a.note && <div className="text-[11px] text-ink-600 mt-0.5">Ghi chú: "{a.note}"</div>}
@@ -309,7 +345,7 @@ function EvidenceTab({ pendingActions, onConfirm, onRequestMore }) {
         {pendingActions.length === 0 && <div className="p-4 text-sm text-ink-600">Không có minh chứng nào đang chờ 🎉</div>}
         {pendingActions.map((a) => (
           <div key={a.id} className="flex items-center gap-3 px-4 py-3 border-b border-sand-100 last:border-0">
-            <div className="w-11 h-11 rounded-lg flex items-center justify-center bg-leaf-100 text-lg flex-none">{CHALLENGES[a.challenge_id]?.icon || '🌱'}</div>
+            <EvidenceThumb photoPath={a.photo_path} fallbackIcon={CHALLENGES[a.challenge_id]?.icon || '🌱'} />
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold">{a.full_name}</div>
               <div className="text-[11px] text-ink-600">Ngày {a.day_number} · {CHALLENGES[a.challenge_id]?.name} · "{a.action_text}"</div>
