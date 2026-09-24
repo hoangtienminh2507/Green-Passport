@@ -518,14 +518,126 @@ function Legend({ swatch, label }) {
 }
 
 function AuctionTab({ commitments, setCommitment }) {
+  const list = Object.values(CHALLENGES);
+  const [selId, setSelId] = useState(list[0].id);
+  const ch = CHALLENGES[selId];
+  const choice = commitments[ch.id];
+  const joinedCount = list.filter((c) => commitments[c.id] === 'in').length;
+  const total = 80, in_ = 62;
+  const pct = Math.round((in_ / total) * 100);
+  const goingDown = ch.target < ch.baseline;
+
   return (
     <div>
-      <h1 className="font-display text-[26px] font-extrabold leading-tight tracking-tight sm:text-[32px]">Green Auction: đấu giá thử thách xanh</h1>
-      <p className="mb-6 mt-2 max-w-[60ch] text-sm text-ink-600">Không đấu giá bằng tiền. Mỗi thử thách dựa trên dữ liệu thật của lớp. Chọn "I'M IN" để cam kết tham gia.</p>
-      <div className="grid gap-5 md:grid-cols-2">
-        {Object.values(CHALLENGES).map((c) => (
-          <AuctionCard key={c.id} ch={c} choice={commitments[c.id]} onJoin={setCommitment} />
-        ))}
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 className="font-display text-[22px] font-extrabold leading-tight tracking-tight sm:text-[28px]">Green Auction: đấu giá thử thách xanh</h1>
+        <p className="text-sm text-ink-600">Không đấu giá bằng tiền. Chọn một thử thách để xem và cam kết tham gia.</p>
+      </div>
+
+      <div className="grid items-stretch gap-4 md:grid-cols-[340px_minmax(0,1fr)]">
+        {/* Danh sách thử thách */}
+        <div role="tablist" aria-label="Danh sách thử thách"
+             className="flex gap-1.5 overflow-x-auto rounded-[22px] bg-white p-2 shadow-card md:flex-col md:gap-1 md:rounded-[26px] md:p-2.5">
+          <div className="hidden justify-between px-3 pb-1.5 pt-2 text-[13px] font-semibold text-ink-600 md:flex">
+            <span>Thử thách</span><span>Đã tham gia {joinedCount}/{list.length}</span>
+          </div>
+          {list.map((c) => {
+            const ch_ = commitments[c.id];
+            const active = c.id === selId;
+            return (
+              <button key={c.id} type="button" role="tab" aria-selected={active} onClick={() => setSelId(c.id)}
+                className={`relative flex min-w-[96px] flex-col items-center gap-1.5 rounded-[18px] px-2 py-2.5 text-center transition-colors md:min-w-0 md:flex-row md:gap-3 md:px-3 md:text-left ${active ? 'bg-leaf-100' : 'hover:bg-sand-100'}`}>
+                <span className={`flex h-11 w-11 flex-none items-center justify-center rounded-[14px] text-[22px] ${TINT[c.id] || 'bg-leaf-100'}`} aria-hidden="true">{c.icon}</span>
+                <span className="min-w-0 md:flex-1">
+                  <span className="hidden text-xs leading-tight text-ink-600 md:block">{c.name}</span>
+                  <span className="block text-[12.5px] font-bold leading-tight md:text-[14.5px]">{c.title.split('–').pop().trim()}</span>
+                </span>
+                <span aria-label={ch_ === 'in' ? 'Đã tham gia' : ch_ === 'skip' ? 'Chưa tham gia' : 'Chưa chọn'}
+                  className={`absolute right-2 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold md:static md:h-6 md:w-6 md:text-xs ${ch_ === 'in' ? 'bg-leaf-500 text-white' : ch_ === 'skip' ? 'bg-sand-100 text-ink-600' : 'border-2 border-dashed border-line'}`}>
+                  {ch_ === 'in' ? '✓' : ch_ === 'skip' ? '–' : ''}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Chi tiết thử thách đang chọn */}
+        <section aria-live="polite" className="flex flex-col rounded-[28px] bg-white p-5 shadow-card sm:px-7 sm:py-6">
+          <div className="flex items-center gap-4">
+            <div className={`flex h-[60px] w-[60px] flex-none items-center justify-center rounded-[20px] text-[30px] ${TINT[ch.id] || 'bg-leaf-100'}`} aria-hidden="true">{ch.icon}</div>
+            <div>
+              <div className="text-[13px] font-medium text-ink-600">{ch.name}</div>
+              <h2 className="font-display text-[20px] font-extrabold leading-snug tracking-tight sm:text-[22px]">{ch.title}</h2>
+            </div>
+          </div>
+
+          <p className="mt-3.5 text-sm text-ink-600">{ch.baselineLabel} còn {goingDown ? 'cao' : 'thấp'}</p>
+
+          <div className="mt-3.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[20px] bg-sand-100/70 px-5 py-4">
+            <div>
+              <div className="text-xs text-ink-600">Hiện tại</div>
+              <div className="font-display text-[22px] font-extrabold leading-tight tracking-tight sm:text-[28px]">
+                {ch.baseline}<span className="ml-1 text-[13px] font-medium text-ink-600">{ch.unit}</span>
+              </div>
+            </div>
+            <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-white text-leaf-500 shadow-sm" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-ink-600">Mục tiêu</div>
+              <div className="font-display text-[22px] font-extrabold leading-tight tracking-tight text-forest-700 sm:text-[28px]">
+                {goingDown ? '≤ ' : '≥ '}{ch.target}<span className="ml-1 text-[13px] font-medium text-ink-600">{ch.unit}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-2 flex justify-between text-sm font-semibold">
+              <span>{in_}/{total} học sinh tham gia</span>
+              <span className="text-forest-700">{pct}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-sand-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full rounded-full bg-gradient-to-r from-[#8FE0BD] to-leaf-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+
+          {ch.actions && (
+            <div className="mt-4">
+              <h3 className="mb-2 text-[13px] font-semibold text-ink-600">Hành động gợi ý</h3>
+              <div className="flex flex-wrap gap-2">
+                {ch.actions.map((a) => (
+                  <span key={a} className="rounded-full bg-sand-100 px-3.5 py-1.5 text-[13px]">{a}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-auto pt-5">
+            {choice === 'in' && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="inline-flex items-center gap-2 rounded-full bg-leaf-100 py-2 pl-2.5 pr-4 text-sm font-bold text-forest-700">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-leaf-500 text-xs text-white">✓</span>
+                  Bạn đã tham gia · I'M IN
+                </span>
+                <button type="button" onClick={() => setCommitment(ch.id, 'skip')} className="text-[13px] text-ink-600 underline hover:text-ink">Rút lại</button>
+              </div>
+            )}
+            {choice === 'skip' && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="inline-flex items-center rounded-full bg-sand-100 px-4 py-2 text-sm font-semibold text-ink-600">Bạn chọn · NOT YET</span>
+                <button type="button" onClick={() => setCommitment(ch.id, 'in')} className="text-[13px] font-semibold text-forest-700 underline">Tham gia ngay</button>
+              </div>
+            )}
+            {!choice && (
+              <div className="flex max-w-[420px] gap-2.5">
+                <button type="button" onClick={() => setCommitment(ch.id, 'in')}
+                  className="flex-1 rounded-[15px] bg-gradient-to-br from-leaf-500 to-forest-700 py-3 text-sm font-bold text-white transition hover:brightness-110">I'M IN</button>
+                <button type="button" onClick={() => setCommitment(ch.id, 'skip')}
+                  className="flex-1 rounded-[15px] bg-sand-100 py-3 text-sm font-bold text-ink-600 transition-colors hover:bg-line">NOT YET</button>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
