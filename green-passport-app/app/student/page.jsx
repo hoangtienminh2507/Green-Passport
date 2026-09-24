@@ -175,24 +175,27 @@ export default function StudentPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="sticky top-0 z-20 text-white px-4 py-3.5 flex items-center justify-between"
-           style={{ background: 'linear-gradient(180deg,#163C2C,#1B4332)', paddingTop: 'calc(14px + env(safe-area-inset-top,0px))' }}>
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🌱</span>
-          <span className="font-display font-bold text-sm">Green Passport</span>
+      <div className="sticky top-0 z-20 text-white"
+           style={{ background: 'linear-gradient(100deg,#1D4A3E,#2B7461)', paddingTop: 'env(safe-area-inset-top,0px)' }}>
+        <div className="mx-auto flex h-[62px] w-full max-w-[1120px] items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 text-[18px]" aria-hidden="true">🌱</span>
+            <span className="font-display text-[17px] font-bold tracking-tight">Green Passport</span>
+          </div>
+          <button onClick={handleLogout} aria-label="Đăng xuất"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm transition-colors hover:bg-white/25">⏻</button>
         </div>
-        <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-white/15 text-xs">⏻</button>
       </div>
 
       <div className="flex-1 flex justify-center">
-        <div className="w-full max-w-3xl px-4 py-5 pb-24">
+        <div className="w-full max-w-[1120px] px-4 py-6 pb-24 sm:px-6">
 
           {/* desktop tabs */}
-          <div className="hidden md:flex gap-1.5 bg-white p-1.5 rounded-xl shadow mb-6 w-fit">
+          <div className="hidden md:flex gap-1 bg-white p-1.5 rounded-[18px] shadow-card mb-8">
             {TABS.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 ${tab === t.id ? 'bg-forest-700 text-white' : 'text-ink-600 hover:bg-sand-100'}`}>
-                {t.ic} {t.label}
+                className={`flex-1 px-4 py-2.5 rounded-[13px] text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors ${tab === t.id ? 'bg-leaf-100 text-forest-700 font-bold' : 'text-ink-600 font-medium hover:bg-sand-100'}`}>
+                <span aria-hidden="true">{t.ic}</span> {t.label}
               </button>
             ))}
           </div>
@@ -357,47 +360,111 @@ function Row({ k, v, last }) {
   );
 }
 
+const DAY_STYLE = {
+  confirmed: 'bg-gradient-to-br from-[#45C295] to-[#238F6E] text-white shadow-[0_6px_14px_rgba(35,143,110,.25)]',
+  done: 'bg-leaf-100 text-leaf-600',
+  needs: 'bg-honey-soft text-[#A8691F] ring-1 ring-inset ring-honey',
+  empty: 'bg-sand-100 text-ink-400',
+};
+const STATUS_LABEL = { confirmed: 'Giáo viên đã xác nhận', done: 'Đã thực hiện', needs: 'Cần bổ sung minh chứng', empty: 'Chưa cập nhật' };
+
+function DayIcon({ status }) {
+  if (status === 'confirmed' || status === 'done') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 12.5l4.5 4.5L19 7.5" />
+      </svg>
+    );
+  }
+  if (status === 'needs') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+        <path d="M12 6v8" /><circle cx="12" cy="18.5" r=".6" fill="currentColor" />
+      </svg>
+    );
+  }
+  return <span className="h-4" />;
+}
+
 function JourneyTab({ student, dayMap, openDay, setOpenDay }) {
+  const cur = student.current_day || 1;
   const entry = openDay ? dayMap[openDay] : null;
+  const statusOf = (day) => {
+    const e = dayMap[day];
+    if (e) return e.status;
+    return day >= cur ? 'empty' : 'done';
+  };
+  const statuses = Array.from({ length: 30 }, (_, i) => statusOf(i + 1));
+  const doneCount = statuses.filter((x) => x === 'confirmed' || x === 'done').length;
+  const needsCount = statuses.filter((x) => x === 'needs').length;
+
   return (
     <div>
-      <SectionTitle icon="📅" text="My Green Journey — Hành trình 30 ngày" />
-      <div className="bg-white rounded-2xl shadow p-4.5">
-        <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-[26px] font-extrabold leading-tight tracking-tight sm:text-[32px]">Hành trình xanh 30 ngày</h1>
+          <p className="mt-1.5 text-sm text-ink-600">Mỗi ngày một hành động nhỏ cho môi trường. Hôm nay là ngày {cur}.</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="min-w-[110px] rounded-2xl bg-white px-5 py-3 shadow-card">
+            <div className="font-display text-2xl font-extrabold leading-tight">{doneCount}/30</div>
+            <div className="text-xs text-ink-600">ngày hoàn thành</div>
+          </div>
+          <div className="min-w-[110px] rounded-2xl bg-white px-5 py-3 shadow-card">
+            <div className="font-display text-2xl font-extrabold leading-tight">{needsCount}</div>
+            <div className="text-xs text-ink-600">cần bổ sung</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[28px] bg-white p-5 shadow-card sm:p-7">
+        <div className="mb-6 h-2 overflow-hidden rounded-full bg-sand-100">
+          <div className="h-full rounded-full bg-gradient-to-r from-[#8FE0BD] to-leaf-500 transition-all duration-700" style={{ width: `${Math.round((doneCount / 30) * 100)}%` }} />
+        </div>
+
+        <div className="grid grid-cols-5 gap-2.5 sm:grid-cols-6 md:grid-cols-10 md:gap-3">
           {Array.from({ length: 30 }, (_, idx) => {
             const day = idx + 1;
-            const e = dayMap[day];
-            const status = e ? e.status : (day > student.current_day ? 'empty' : day === student.current_day ? 'empty' : 'done');
-            const bg = status === 'confirmed' ? 'bg-forest-600' : status === 'done' ? 'bg-leaf-500' : status === 'needs' ? 'bg-amber-500' : 'bg-sand-100 text-ink-400';
-            const icon = status === 'confirmed' ? '🔵' : status === 'done' ? '🟢' : status === 'needs' ? '🟡' : '⚪';
+            const status = statuses[idx];
+            const isToday = day === cur;
+            const isOpen = day === openDay;
             return (
               <button key={day} onClick={() => setOpenDay(day)}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-white text-[11px] font-bold ${bg} ${day === student.current_day ? 'ring-2 ring-forest-800 ring-offset-1' : ''}`}>
-                <div className="text-[13px]">{icon}</div><div className="text-[10px] opacity-85">{day}</div>
+                aria-label={`Ngày ${day}: ${STATUS_LABEL[status]}`}
+                className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-0.5 text-[15px] font-semibold transition-transform hover:-translate-y-0.5 ${DAY_STYLE[status]} ${isToday ? 'ring-2 ring-leaf-500 ring-offset-[3px]' : ''} ${isOpen && !isToday ? 'ring-2 ring-ink ring-offset-[3px]' : ''}`}>
+                <DayIcon status={status} />
+                <span>{day}</span>
               </button>
             );
           })}
         </div>
-        <div className="flex flex-wrap gap-3 mt-3.5 text-[11.5px] text-ink-600">
-          <Legend color="#2D6A4F" label="Giáo viên đã xác nhận" />
-          <Legend color="#52B788" label="Đã thực hiện" />
-          <Legend color="#E3A63C" label="Cần bổ sung minh chứng" />
-          <Legend color="#DCE6DC" label="Chưa cập nhật" />
+
+        <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-5 text-[13.5px] text-ink-600">
+          <Legend swatch="bg-gradient-to-br from-[#45C295] to-[#238F6E]" label="Giáo viên đã xác nhận" />
+          <Legend swatch="bg-leaf-100 ring-1 ring-inset ring-leaf-500" label="Đã thực hiện" />
+          <Legend swatch="bg-honey-soft ring-1 ring-inset ring-honey" label="Cần bổ sung minh chứng" />
+          <Legend swatch="bg-sand-100" label="Chưa cập nhật" />
         </div>
-        {entry && (
-          <div className="mt-3.5 bg-sand-50 rounded-xl p-3.5 text-[12.5px] space-y-1.5">
-            <Row k="Ngày" v={`${openDay}/30`} />
-            <Row k="Hành động" v={entry.action_text || '—'} />
-            <Row k="Trạng thái" v={entry.status === 'confirmed' ? '🔵 Đã xác nhận' : entry.status === 'needs' ? '🟡 Cần bổ sung' : '🟢 Đã thực hiện'} last />
-          </div>
-        )}
-        {openDay && !entry && <div className="mt-3.5 bg-sand-50 rounded-xl p-3.5 text-[12.5px] text-ink-600">Chưa có dữ liệu cho ngày này.</div>}
       </div>
+
+      {openDay && (
+        <div className="mt-4 rounded-2xl bg-white p-5 shadow-card text-[13.5px]">
+          <div className="font-display text-base font-bold">Ngày {openDay}{openDay === cur ? ' · hôm nay' : ''}</div>
+          {entry ? (
+            <div className="mt-2 space-y-1.5">
+              <Row k="Hành động" v={entry.action_text || '—'} />
+              <Row k="Trạng thái" v={STATUS_LABEL[entry.status] || STATUS_LABEL.done} last />
+            </div>
+          ) : (
+            <p className="mt-1 text-ink-600">{openDay > cur ? 'Chưa đến ngày này.' : 'Chưa có dữ liệu cho ngày này.'}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-function Legend({ color, label }) {
-  return <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: color }} />{label}</span>;
+function Legend({ swatch, label }) {
+  return <span className="inline-flex items-center gap-2"><span className={`h-3.5 w-3.5 rounded-[5px] ${swatch}`} />{label}</span>;
 }
 
 function AuctionTab({ commitments, setCommitment }) {
