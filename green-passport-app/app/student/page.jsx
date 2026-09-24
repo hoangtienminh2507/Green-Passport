@@ -25,6 +25,7 @@ export default function StudentPage() {
   const [tab, setTab] = useState('home');
   const [modalOpen, setModalOpen] = useState(false);
   const [recordChoice, setRecordChoice] = useState(null);
+  const [recordChId, setRecordChId] = useState(null); // thử thách đang ghi nhận (chọn từ tab Green Auction)
   const [note, setNote] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -72,7 +73,7 @@ export default function StudentPage() {
   async function submitEvidence() {
     if (recordChoice === null || !student) return;
     setSubmitting(true);
-    const challengeId = student.challenge_id || 'plastic';
+    const challengeId = recordChId || student.challenge_id || 'plastic';
     const ch = CHALLENGES[challengeId];
     const dayNumber = student.current_day || 1;
     const actionText = ch.actions[recordChoice];
@@ -201,14 +202,15 @@ export default function StudentPage() {
           </div>
 
           {tab === 'home' && (
-            <HomeTab profile={profile} student={student} ch={ch} progress={progress} doneToday={doneToday} today={today}
-              onRecord={() => setModalOpen(true)} commitments={commitments} setCommitment={setCommitment} challengeId={challengeId} />
+            <HomeTab profile={profile} student={student} progress={progress} commitments={commitments}
+              dailyActions={dailyActions} onGoAuction={() => setTab('auction')} />
           )}
           {tab === 'journey' && (
             <JourneyTab student={student} dayMap={dayMap} openDay={openDay} setOpenDay={setOpenDay} />
           )}
           {tab === 'auction' && (
-            <AuctionTab commitments={commitments} setCommitment={setCommitment} />
+            <AuctionTab commitments={commitments} setCommitment={setCommitment} student={student} dailyActions={dailyActions}
+              onRecord={(id) => { setRecordChId(id); setRecordChoice(null); setModalOpen(true); }} />
           )}
           {tab === 'wall' && <WallTab />}
           {tab === 'meter' && <MeterTab />}
@@ -228,7 +230,7 @@ export default function StudentPage() {
 
       {modalOpen && (
         <RecordModal
-          ch={ch} dayNumber={student.current_day} recordChoice={recordChoice} setRecordChoice={setRecordChoice}
+          ch={CHALLENGES[recordChId] || ch} dayNumber={student.current_day} recordChoice={recordChoice} setRecordChoice={setRecordChoice}
           note={note} setNote={setNote}
           photoPreview={photoPreview} onPhotoChange={handlePhotoChange}
           onClose={() => { setModalOpen(false); setPhotoFile(null); setPhotoPreview(null); }}
@@ -247,61 +249,104 @@ export default function StudentPage() {
 
 /* ---------------- Sub-components ---------------- */
 
-function HomeTab({ profile, student, ch, progress, doneToday, today, onRecord, commitments, setCommitment, challengeId }) {
-  const openChallenge = Object.values(CHALLENGES).find((c) => c.id !== challengeId && !commitments[c.id]);
+function HomeTab({ profile, student, progress, commitments, dailyActions, onGoAuction }) {
+  const joined = Object.values(CHALLENGES).filter((c) => commitments[c.id] === 'in');
+  const countOf = (id) => dailyActions.filter((d) => d.challenge_id === id).length;
+  const initials = (profile.full_name || '').split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase();
+  const streak = student.streak || 0;
+  const nextBadge = BADGE_DEFS.find((b) => b.needStreak > streak);
+  const nextPct = nextBadge ? Math.min(100, Math.round((streak / nextBadge.needStreak) * 100)) : 100;
+
   return (
-    <div className="md:grid md:grid-cols-[1.15fr_.85fr] md:gap-6 md:items-start">
+    <div className="grid items-start gap-6 md:grid-cols-[1.15fr_1fr]">
       <div>
-        <div className="rounded-3xl p-6 text-white relative overflow-hidden"
-             style={{ background: 'radial-gradient(400px 220px at 100% 0%, rgba(255,255,255,.14), transparent 60%), linear-gradient(150deg,#1B4332,#0F2A20)' }}>
-          <div className="text-[11px] font-bold tracking-wide text-leaf-400 uppercase">Green Passport</div>
-          <div className="font-display text-xl font-bold mt-0.5">{profile.full_name}</div>
-          <div className="text-xs text-white/70">Lớp {student.class_id ? student.class_id.slice(0, 8) : '—'}</div>
-          <div className="mt-4 bg-white/10 rounded-xl px-3.5 py-3 flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] text-white/65 font-semibold">Thử thách</div>
-              <div className="font-display font-bold text-sm mt-0.5">{ch.icon} {ch.title}</div>
+        {/* Thẻ Passport */}
+        <div className="relative overflow-hidden rounded-[28px] p-6 text-white shadow-[0_20px_40px_-18px_rgba(29,74,62,.55)] sm:p-7"
+             style={{ background: 'linear-gradient(150deg,#1D4A3E,#2B7461)' }}>
+          <span className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-white/[.07]" />
+          <span className="pointer-events-none absolute -bottom-20 right-12 h-40 w-40 rounded-full bg-white/[.07]" />
+          <div className="relative">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full text-[19px] font-extrabold ring-[3px] ring-white/20"
+                   style={{ background: 'linear-gradient(145deg,#8FE0BD,#2AA37C)' }}>{initials}</div>
+              <div>
+                <div className="font-display text-[22px] font-extrabold leading-tight tracking-tight">{profile.full_name}</div>
+                <div className="text-[13.5px] text-white/75">Green Passport · Lớp {student.class_id ? student.class_id.slice(0, 8) : '—'}</div>
+              </div>
             </div>
-            <div className="bg-leaf-100 text-forest-700 text-xs font-bold px-2.5 py-1 rounded-full">{student.current_day}/30 ngày</div>
-          </div>
-          <div className="h-2 rounded-full bg-white/15 overflow-hidden mt-3.5">
-            <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#74C69D,#52B788)' }} />
-          </div>
-          <div className="grid grid-cols-3 gap-2.5 mt-3.5">
-            <StatBox num={`${progress}%`} lbl="Tiến độ" />
-            <StatBox num={`🔥 ${student.streak}`} lbl="Streak" />
-            <StatBox num={`📷 ${student.evidence_count}`} lbl="Minh chứng" />
+
+            <div className="mt-5 flex items-center justify-between gap-3 rounded-[20px] bg-white/[.12] px-4 py-3.5">
+              <div>
+                <div className="text-xs text-white/75">Bạn đang tham gia</div>
+                <div className="font-display text-base font-bold">{joined.length} thử thách</div>
+              </div>
+              <span className="flex-none rounded-full bg-leaf-100 px-3 py-1 text-[13px] font-bold text-forest-700">Ngày {student.current_day}/30</span>
+            </div>
+
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[.18]">
+              <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#8FE0BD,#C8F4DD)' }} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2.5">
+              {[[`${progress}%`, 'Tiến độ'], [`🔥 ${streak}`, 'Streak'], [`📷 ${student.evidence_count || 0}`, 'Minh chứng']].map(([num, lbl]) => (
+                <div key={lbl} className="rounded-[18px] bg-white/[.12] px-2 py-3.5 text-center">
+                  <div className="font-display text-2xl font-extrabold leading-tight">{num}</div>
+                  <div className="text-[12.5px] text-white/80">{lbl}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <button onClick={onRecord}
-          className={`mt-4 w-full rounded-2xl p-4.5 flex items-center gap-3.5 text-left ${doneToday ? 'bg-sand-100 text-ink-600' : 'text-white shadow-lg'}`}
-          style={!doneToday ? { background: 'linear-gradient(135deg,#52B788,#2D6A4F)' } : {}}>
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl ${doneToday ? 'bg-leaf-100 text-forest-700' : 'bg-white/20'}`}>
-            {doneToday ? '✅' : '📷'}
-          </div>
-          <div>
-            <div className="font-display font-bold text-[15px]">{doneToday ? 'Hôm nay đã được ghi nhận' : 'GHI NHẬN HÀNH ĐỘNG HÔM NAY'}</div>
-            <div className="text-[11.5px] opacity-80 mt-0.5">{doneToday ? (today?.action_text || '') : 'Chỉ mất khoảng 20–30 giây'}</div>
-          </div>
-        </button>
+        {/* Hướng dẫn ghi nhận (thay cho nút ghi nhận cũ) */}
+        <div className="mt-3.5 flex flex-wrap items-center gap-3.5 rounded-[22px] bg-white px-[18px] py-4 shadow-card">
+          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-leaf-100 text-[22px]" aria-hidden="true">🏷️</div>
+          <p className="min-w-[180px] flex-1 text-sm text-ink-600">
+            <b className="block text-[15px] text-ink">{joined.length ? 'Muốn ghi nhận hành động hôm nay?' : 'Bạn chưa chọn thử thách nào'}</b>
+            {joined.length ? 'Vào Green Auction, chọn thử thách của bạn rồi tải minh chứng.' : 'Vào Green Auction, chọn "I\'M IN" để bắt đầu.'}
+          </p>
+          <button type="button" onClick={onGoAuction}
+            className="rounded-[15px] bg-gradient-to-br from-leaf-500 to-forest-700 px-5 py-3 text-sm font-bold text-white transition hover:brightness-110">Đến Green Auction</button>
+        </div>
       </div>
 
-      <div className="mt-6 md:mt-0">
-        <SectionTitle icon="🔥" text="Green Streak" />
-        <div className="bg-white rounded-2xl shadow p-4.5 flex items-center gap-3.5 mb-4">
-          <div className="text-3xl">🔥</div>
-          <div>
-            <div className="font-bold text-[13.5px]">Duy trì {student.streak} ngày liên tiếp!</div>
-            <div className="text-[11.5px] text-ink-600 mt-0.5">Streak chỉ để tạo động lực, không xếp hạng.</div>
+      <div>
+        <h2 className="mb-3 font-display text-lg font-extrabold tracking-tight">Green Streak</h2>
+        <div className="rounded-[26px] bg-white p-5 shadow-card">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 flex-none items-center justify-center rounded-[20px] bg-honey-soft text-[32px] ring-1 ring-inset ring-[#EFD5AC]" aria-hidden="true">🔥</div>
+            <div>
+              <div className="font-display text-[21px] font-extrabold leading-tight">Duy trì {streak} ngày liên tiếp!</div>
+              <p className="text-[13.5px] text-ink-600">Streak chỉ để tạo động lực, không xếp hạng.</p>
+            </div>
+          </div>
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="mb-2 flex justify-between text-[13.5px] font-semibold">
+              <span>{nextBadge ? `Huy hiệu tiếp theo: ${nextBadge.name}` : 'Bạn đã đạt tất cả huy hiệu'}</span>
+              {nextBadge && <span className="font-medium text-ink-600">{streak}/{nextBadge.needStreak} ngày</span>}
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-sand-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#8FE0BD] to-leaf-500" style={{ width: `${nextPct}%` }} />
+            </div>
           </div>
         </div>
-        <SectionTitle icon="🏷️" text="Green Auction đang mở" />
-        {openChallenge ? (
-          <AuctionCard ch={openChallenge} choice={commitments[openChallenge.id]} onJoin={setCommitment} />
-        ) : (
-          <div className="bg-white rounded-2xl shadow p-4 text-[12.5px] text-ink-600">Bạn đã phản hồi hết các thử thách đang mở.</div>
-        )}
+
+        <h2 className="mb-3 mt-6 font-display text-lg font-extrabold tracking-tight">Thử thách của bạn</h2>
+        <div className="rounded-[26px] bg-white p-4 shadow-card">
+          {joined.length ? (
+            <div className="flex flex-col gap-2">
+              {joined.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-sand-100/70 px-2.5 py-2">
+                  <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl text-lg ${TINT[c.id] || 'bg-leaf-100'}`} aria-hidden="true">{c.icon}</span>
+                  <span className="flex-1 text-sm font-bold">{c.title.split('–').pop().trim()}</span>
+                  <span className="rounded-full bg-leaf-100 px-3 py-0.5 text-xs font-semibold text-forest-700">{countOf(c.id)} lần ghi nhận</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-1 py-1 text-sm text-ink-600">Bạn chưa tham gia thử thách nào. Vào Green Auction để chọn.</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -517,7 +562,7 @@ function Legend({ swatch, label }) {
   return <span className="inline-flex items-center gap-2"><span className={`h-3.5 w-3.5 rounded-[5px] ${swatch}`} />{label}</span>;
 }
 
-function AuctionTab({ commitments, setCommitment }) {
+function AuctionTab({ commitments, setCommitment, student, dailyActions, onRecord }) {
   const list = Object.values(CHALLENGES);
   const [selId, setSelId] = useState(list[0].id);
   const ch = CHALLENGES[selId];
@@ -526,6 +571,7 @@ function AuctionTab({ commitments, setCommitment }) {
   const total = 80, in_ = 62;
   const pct = Math.round((in_ / total) * 100);
   const goingDown = ch.target < ch.baseline;
+  const recordedCount = dailyActions.filter((d) => d.challenge_id === ch.id).length;
 
   return (
     <div>
@@ -601,13 +647,22 @@ function AuctionTab({ commitments, setCommitment }) {
             </div>
           </div>
 
-          {ch.actions && (
-            <div className="mt-4">
-              <h3 className="mb-2 text-[13px] font-semibold text-ink-600">Hành động gợi ý</h3>
-              <div className="flex flex-wrap gap-2">
-                {ch.actions.map((a) => (
-                  <span key={a} className="rounded-full bg-sand-100 px-3.5 py-1.5 text-[13px]">{a}</span>
-                ))}
+          {choice === 'in' ? (
+            <div className="mt-4 flex flex-wrap items-center gap-4 rounded-[22px] bg-honey-soft px-5 py-4 ring-1 ring-inset ring-[#EFD5AC]">
+              <div className="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white text-[22px]" aria-hidden="true">📷</div>
+              <div className="min-w-[180px] flex-1">
+                <div className="font-display text-base font-bold">Ghi nhận hành động ngày {student.current_day}</div>
+                <p className="text-[13.5px] text-ink-600">{recordedCount ? `Bạn đã ghi nhận ${recordedCount} lần cho thử thách này. ` : ''}Chụp ảnh minh chứng, chỉ mất khoảng 20–30 giây.</p>
+              </div>
+              <button type="button" onClick={() => onRecord(ch.id)}
+                className="rounded-[15px] bg-gradient-to-br from-leaf-500 to-forest-700 px-5 py-3 text-sm font-bold text-white transition hover:brightness-110">Tải minh chứng</button>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-4 rounded-[22px] bg-sand-100/70 px-5 py-4">
+              <div className="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-white text-[22px]" aria-hidden="true">🔒</div>
+              <div>
+                <div className="font-display text-base font-bold">Tham gia để ghi nhận hành động</div>
+                <p className="text-[13.5px] text-ink-600">Chọn "I'M IN" để mở phần tải minh chứng cho thử thách này.</p>
               </div>
             </div>
           )}
