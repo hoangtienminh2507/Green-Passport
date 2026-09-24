@@ -319,37 +319,86 @@ function SectionTitle({ icon, text }) {
   return <div className="text-sm font-bold mb-3 flex items-center gap-1.5">{icon} {text}</div>;
 }
 
+const TINT = {
+  energy: 'bg-[#FCF1E1]',
+  plastic: 'bg-[#DFF1F6]',
+  waste: 'bg-[#DCF3EA]',
+  transport: 'bg-[#ECE9F8]',
+  green_space: 'bg-[#E6F3D9]',
+};
+
 function AuctionCard({ ch, choice, onJoin }) {
   const total = 80, in_ = 62;
   const pct = Math.round((in_ / total) * 100);
+  const goingDown = ch.target < ch.baseline;
   return (
-    <div className="bg-white rounded-2xl shadow overflow-hidden mb-3.5">
-      <div className="px-4 pt-3.5">
-        <span className="inline-flex items-center gap-1 bg-leaf-100 text-forest-700 text-[11.5px] font-bold px-2.5 py-1 rounded-full">{ch.icon} {ch.name}</span>
-        <div className="font-display font-bold text-[15px] mt-2">{ch.title}</div>
+    <article className="flex h-full flex-col rounded-[28px] bg-white p-5 shadow-card sm:p-6">
+      <div className="flex items-center gap-3.5">
+        <div className={`flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[17px] text-[26px] ${TINT[ch.id] || 'bg-leaf-100'}`} aria-hidden="true">{ch.icon}</div>
+        <div>
+          <div className="text-[13px] font-medium text-ink-600">{ch.name}</div>
+          <h3 className="font-display text-[18px] font-bold leading-snug tracking-tight">{ch.title}</h3>
+        </div>
       </div>
-      <div className="px-4 pb-4 pt-1.5">
-        <Row k="Vấn đề" v={`${ch.baselineLabel} còn cao`} />
-        <Row k="Dữ liệu ban đầu" v={`${ch.baseline} ${ch.unit}`} />
-        <Row k="Mục tiêu" v={`≤ ${ch.target} ${ch.unit}`} last />
-        {choice ? (
-          <>
-            <div className="mt-3 bg-sand-50 rounded-xl px-3 py-2.5">
-              <div className="flex justify-between text-xs font-bold mb-1.5"><span>{in_}/{total} học sinh tham gia</span><span>{pct}%</span></div>
-              <div className="h-2 rounded-full bg-sand-100 overflow-hidden"><div className="h-full rounded-full bg-forest-600" style={{ width: `${pct}%` }} /></div>
-            </div>
-            <div className={`mt-3 inline-block text-xs font-bold px-2.5 py-1 rounded-full ${choice === 'in' ? 'bg-leaf-100 text-forest-700' : 'bg-sand-100 text-ink-600'}`}>
-              {choice === 'in' ? "🟢 Bạn đã tham gia — I'M IN" : '🔴 Bạn chọn — NOT YET'}
-            </div>
-          </>
-        ) : (
-          <div className="flex gap-2.5 mt-3">
-            <button onClick={() => onJoin(ch.id, 'in')} className="flex-1 bg-leaf-500 text-forest-900 font-bold rounded-xl py-2.5 text-[13px]">🟢 I'M IN</button>
-            <button onClick={() => onJoin(ch.id, 'skip')} className="flex-1 border border-sand-100 font-bold rounded-xl py-2.5 text-[13px]">🔴 NOT YET</button>
+
+      <p className="mt-4 text-sm text-ink-600">{ch.baselineLabel} còn {goingDown ? 'cao' : 'thấp'}</p>
+
+      <div className="mt-3.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[20px] bg-sand-100/70 px-[18px] py-4">
+        <div>
+          <div className="text-xs text-ink-600">Hiện tại</div>
+          <div className="font-display text-2xl font-extrabold leading-tight tracking-tight">
+            {ch.baseline}<span className="ml-1 text-[13px] font-medium text-ink-600">{ch.unit}</span>
+          </div>
+        </div>
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-white text-leaf-500 shadow-sm" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-ink-600">Mục tiêu</div>
+          <div className="font-display text-2xl font-extrabold leading-tight tracking-tight text-forest-700">
+            {goingDown ? '≤ ' : '≥ '}{ch.target}<span className="ml-1 text-[13px] font-medium text-ink-600">{ch.unit}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-[18px]">
+        <div className="mb-2 flex justify-between text-sm font-semibold">
+          <span>{in_}/{total} học sinh tham gia</span>
+          <span className="text-forest-700">{pct}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-sand-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full rounded-full bg-gradient-to-r from-[#8FE0BD] to-leaf-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="mt-auto pt-5">
+        {choice === 'in' && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-2 rounded-full bg-leaf-100 py-2 pl-2.5 pr-4 text-sm font-bold text-forest-700">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-leaf-500 text-white">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+              </span>
+              Bạn đã tham gia · I'M IN
+            </span>
+            <button type="button" onClick={() => onJoin(ch.id, 'skip')} className="text-[13px] text-ink-600 underline hover:text-ink">Rút lại</button>
+          </div>
+        )}
+        {choice === 'skip' && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center rounded-full bg-sand-100 px-4 py-2 text-sm font-semibold text-ink-600">Bạn chọn · NOT YET</span>
+            <button type="button" onClick={() => onJoin(ch.id, 'in')} className="text-[13px] font-semibold text-forest-700 underline">Tham gia ngay</button>
+          </div>
+        )}
+        {!choice && (
+          <div className="flex gap-2.5">
+            <button type="button" onClick={() => onJoin(ch.id, 'in')}
+              className="flex-1 rounded-[15px] bg-gradient-to-br from-leaf-500 to-forest-700 py-3 text-sm font-bold text-white transition hover:brightness-110">I'M IN</button>
+            <button type="button" onClick={() => onJoin(ch.id, 'skip')}
+              className="flex-1 rounded-[15px] bg-sand-100 py-3 text-sm font-bold text-ink-600 transition-colors hover:bg-line">NOT YET</button>
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 }
 function Row({ k, v, last }) {
@@ -470,16 +519,16 @@ function Legend({ swatch, label }) {
 function AuctionTab({ commitments, setCommitment }) {
   return (
     <div>
-      <SectionTitle icon="🏷️" text="Green Auction — Đấu giá thử thách xanh" />
-      <p className="text-[12.5px] text-ink-600 mb-4">Không phải đấu giá bằng tiền — mỗi thử thách dựa trên dữ liệu thật của lớp. Chọn "I'm in" để cam kết tham gia.</p>
-      <div className="md:grid md:grid-cols-2 md:gap-3.5">
+      <h1 className="font-display text-[26px] font-extrabold leading-tight tracking-tight sm:text-[32px]">Green Auction: đấu giá thử thách xanh</h1>
+      <p className="mb-6 mt-2 max-w-[60ch] text-sm text-ink-600">Không đấu giá bằng tiền. Mỗi thử thách dựa trên dữ liệu thật của lớp. Chọn "I'M IN" để cam kết tham gia.</p>
+      <div className="grid gap-5 md:grid-cols-2">
         {Object.values(CHALLENGES).map((c) => (
           <AuctionCard key={c.id} ch={c} choice={commitments[c.id]} onJoin={setCommitment} />
         ))}
       </div>
     </div>
   );
-}
+}v
 
 function WallTab() {
   // Dữ liệu tổng hợp cộng đồng — có thể thay bằng truy vấn "select challenge_id, count(*) from daily_actions where created_at::date = current_date group by challenge_id"
