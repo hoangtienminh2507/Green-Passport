@@ -401,6 +401,7 @@ function AuctionCard({ ch, choice, onJoin }) {
     </article>
   );
 }
+
 function Row({ k, v, last }) {
   return (
     <div className={`flex justify-between gap-2.5 py-2 text-[12.5px] ${last ? '' : 'border-b border-dashed border-sand-100'}`}>
@@ -528,7 +529,7 @@ function AuctionTab({ commitments, setCommitment }) {
       </div>
     </div>
   );
-}v
+}
 
 function WallTab() {
   // Dữ liệu tổng hợp cộng đồng — có thể thay bằng truy vấn "select challenge_id, count(*) from daily_actions where created_at::date = current_date group by challenge_id"
