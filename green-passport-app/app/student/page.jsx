@@ -541,36 +541,81 @@ function MiniCard({ icon, num, lbl }) {
 }
 
 function ProfileTab({ profile, student, onLogout }) {
+  const streak = student.streak || 0;
+  const initials = (profile.full_name || '').split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase();
+  const badges = BADGE_DEFS.map((b) => ({
+    ...b,
+    earned: streak >= b.needStreak || (b.id === 'first' && student.current_day > 1),
+  }));
+  const earnedCount = badges.filter((b) => b.earned).length;
+
   return (
-    <div>
-      <SectionTitle icon="🎖️" text="Huy hiệu của tôi" />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
-        {BADGE_DEFS.map((b) => (
-          <div key={b.id} className={`rounded-2xl p-3.5 text-center ${student.streak >= b.needStreak || (b.id === 'first' && student.current_day > 1) ? 'shadow' : 'bg-sand-100 text-ink-400'}`}
-               style={student.streak >= b.needStreak ? { background: 'linear-gradient(160deg,#FFF7E4,#FDECC1)', color: '#8a5a12' } : {}}>
-            <div className="text-2xl">{b.icon}</div>
-            <div className="font-bold text-xs mt-1">{b.name}</div>
-            <div className="text-[10px] opacity-80 mt-0.5">{b.desc}</div>
-          </div>
-        ))}
-      </div>
-      <SectionTitle icon="👤" text="Hồ sơ của tôi" />
-      <div className="bg-white rounded-2xl shadow p-4.5">
-        <div className="flex items-center gap-3">
-          <div className="w-13 h-13 rounded-full flex items-center justify-center text-white font-bold" style={{ width: 52, height: 52, background: 'linear-gradient(145deg,#74C69D,#2D6A4F)' }}>
-            {profile.full_name?.split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase()}
-          </div>
-          <div>
-            <div className="font-bold text-sm">{profile.full_name}</div>
-            <div className="text-xs text-ink-600 mt-0.5">{profile.role}</div>
+    <div className="grid items-start gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
+      {/* Hồ sơ */}
+      <section aria-label="Hồ sơ của tôi">
+        <h2 className="mb-3.5 font-display text-xl font-extrabold tracking-tight">Hồ sơ của tôi</h2>
+        <div className="relative overflow-hidden rounded-[28px] p-7 text-white shadow-[0_20px_40px_-18px_rgba(29,74,62,.55)]"
+             style={{ background: 'linear-gradient(150deg,#1D4A3E,#2B7461)' }}>
+          <span className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/[.07]" />
+          <span className="pointer-events-none absolute -bottom-16 right-10 h-36 w-36 rounded-full bg-white/[.07]" />
+          <div className="relative">
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full text-2xl font-extrabold ring-4 ring-white/20"
+                 style={{ background: 'linear-gradient(145deg,#8FE0BD,#2AA37C)' }}>
+              {initials}
+            </div>
+            <div className="mt-4 font-display text-[22px] font-extrabold leading-tight tracking-tight">{profile.full_name}</div>
+            <span className="mt-1.5 inline-block rounded-full bg-white/15 px-3 py-0.5 text-[13px] font-medium capitalize">{profile.role}</span>
+
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <div className="rounded-[18px] bg-white/[.12] px-4 py-3.5">
+                <div className="font-display text-[26px] font-extrabold leading-tight">{student.current_day}/30</div>
+                <div className="text-[13px] text-white/80">Ngày tham gia</div>
+              </div>
+              <div className="rounded-[18px] bg-white/[.12] px-4 py-3.5">
+                <div className="font-display text-[26px] font-extrabold leading-tight">{student.evidence_count}</div>
+                <div className="text-[13px] text-white/80">Minh chứng đã gửi</div>
+              </div>
+            </div>
+
+            <button onClick={onLogout}
+              className="mt-3.5 w-full rounded-2xl bg-white/15 py-3 text-sm font-semibold transition-colors hover:bg-white/25">
+              Đăng xuất
+            </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2.5 mt-4">
-          <MiniCard icon="📅" num={`${student.current_day}/30`} lbl="Ngày tham gia" />
-          <MiniCard icon="📷" num={student.evidence_count} lbl="Minh chứng đã gửi" />
+      </section>
+
+      {/* Huy hiệu */}
+      <section aria-label="Huy hiệu của tôi">
+        <div className="mb-3.5 flex items-baseline justify-between">
+          <h2 className="font-display text-xl font-extrabold tracking-tight">Huy hiệu của tôi</h2>
+          <span className="text-sm text-ink-600">{earnedCount}/{badges.length} đã đạt</span>
         </div>
-        <button onClick={onLogout} className="w-full bg-sand-100 font-bold rounded-xl py-2.5 text-sm mt-4">Đăng xuất</button>
-      </div>
+        <div className="grid grid-cols-1 gap-3.5 min-[420px]:grid-cols-2">
+          {badges.map((b) => {
+            const pct = Math.min(100, Math.round((streak / b.needStreak) * 100));
+            return (
+              <article key={b.id} className="flex flex-col gap-1 rounded-3xl bg-white p-5 shadow-card">
+                <div className={`mb-2.5 flex h-14 w-14 items-center justify-center rounded-[18px] text-[28px] ${b.earned ? 'bg-honey-soft ring-1 ring-inset ring-[#EFD5AC]' : 'bg-sand-100 opacity-60 grayscale'}`}>
+                  {b.icon}
+                </div>
+                <h3 className={`text-base font-bold ${b.earned ? '' : 'text-ink-600'}`}>{b.name}</h3>
+                <p className="text-[13px] text-ink-600">{b.desc}</p>
+                {b.earned ? (
+                  <span className="mt-2.5 self-start rounded-full bg-leaf-100 px-3 py-0.5 text-xs font-semibold text-forest-700">Đã đạt</span>
+                ) : (
+                  <div className="mt-3">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-sand-100">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#8FE0BD] to-leaf-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="mt-1.5 text-xs text-ink-600">{streak}/{b.needStreak} ngày</div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
