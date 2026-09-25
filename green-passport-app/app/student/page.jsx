@@ -26,7 +26,7 @@ function computeDayNumber(startedAt) {
   return Math.min(30, Math.max(1, diffDays + 1));
 }
 
-export default // Ô avatar + tên ở góc phải header, bấm vào hiện menu Đăng xuất
+// Ô avatar + tên ở góc phải header, bấm vào hiện menu Đăng xuất
 function UserMenu({ profile, onLogout }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -73,7 +73,7 @@ function UserMenu({ profile, onLogout }) {
   );
 }
 
-function StudentPage() {
+export default function StudentPage() {
   const router = useRouter();
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);   // hàng trong bảng users
