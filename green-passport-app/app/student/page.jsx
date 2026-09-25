@@ -698,64 +698,146 @@ function AuctionTab({ commitments, setCommitment, student, dailyActions, onRecor
   );
 }
 
+// Nhãn hiển thị + màu riêng cho từng loại thử thách trên Green Wall.
+// Thử thách nào không có trong danh sách này vẫn hiển thị bình thường, dùng màu mặc định.
+const WALL_META = {
+  plastic:     { label: 'hành động giảm nhựa',      glow: '#ff9f5a', bg: '#fff1e0', fg: '#c96b1f' },
+  energy:      { label: 'hành động tiết kiệm điện', glow: '#f3c34a', bg: '#fff6da', fg: '#a97a1f' },
+  waste:       { label: 'lần phân loại rác',        glow: '#2aa37c', bg: '#dcf3ea', fg: '#23594a' },
+  green_space: { label: 'lượt chăm sóc cây',        glow: '#4fa3ff', bg: '#e4f1ff', fg: '#2b6fc9' },
+  transport:   { label: 'lượt đi lại xanh',         glow: '#b98bea', bg: '#f1e7fb', fg: '#7a4bb0' },
+};
+const WALL_DEFAULT = { glow: '#8fa699', bg: '#eef4f1', fg: '#23594a' };
+
+function WallRing({ pct, color }) {
+  const C = 113; // chu vi vòng tròn r=18
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    requestAnimationFrame(() => { el.style.strokeDashoffset = C * (1 - pct / 100); });
+  }, [pct]);
+  return (
+    <svg viewBox="0 0 44 44" className="h-11 w-11 -rotate-90">
+      <circle cx="22" cy="22" r="18" fill="none" strokeWidth="5" className="stroke-sand-100" />
+      <circle ref={ref} cx="22" cy="22" r="18" fill="none" strokeWidth="5" stroke={color}
+        strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C}
+        style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)' }} />
+    </svg>
+  );
+}
+
 function WallTab() {
-  // Dữ liệu tổng hợp cộng đồng — có thể thay bằng truy vấn "select challenge_id, count(*) from daily_actions where created_at::date = current_date group by challenge_id"
-  const WALL_TODAY = { plastic: 45, energy: 31, waste: 52, green_space: 28 };
+  const [rows, setRows] = useState(null); // null = đang tải, [] = chưa có hành động nào hôm nay
+  const [status, setStatus] = useState('loading');
+  const total = useCountUp(rows ? rows.reduce((s, r) => s + r.action_count, 0) : 0, 1400);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const { data, error: err } = await supabase.rpc('get_wall_stats');
+      if (!alive) return;
+      if (err) { console.error('get_wall_stats:', err.message); setStatus('error'); return; }
+      setRows((data || []).sort((a, b) => b.action_count - a.action_count));
+      setStatus('ok');
+    };
+    load();
+    const timer = setInterval(load, 30000); // tự làm mới mỗi 30 giây
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
+
+  if (status === 'error') {
+    return (
+      <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">
+        Chưa tải được số liệu cộng đồng. Hãy kiểm tra đã chạy file SQL <b>get_wall_stats</b> trên Supabase chưa.
+      </div>
+    );
+  }
+  const maxCount = rows && rows.length ? Math.max(...rows.map((r) => r.action_count)) : 1;
+
   return (
     <div>
-      <SectionTitle icon="🌍" text="Green Wall — Cộng đồng hành động" />
-      <p className="text-[12.5px] text-ink-600 mb-3.5">Hôm nay cộng đồng đã:</p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
-        <WallStat num={`🥤 ${WALL_TODAY.plastic}`} lbl="hành động giảm nhựa" />
-        <WallStat num={`💡 ${WALL_TODAY.energy}`} lbl="hành động tiết kiệm điện" />
-        <WallStat num={`♻️ ${WALL_TODAY.waste}`} lbl="lần phân loại rác" />
-        <WallStat num={`🌳 ${WALL_TODAY.green_space}`} lbl="lượt chăm sóc cây" />
+      <section className="relative isolate overflow-hidden rounded-[32px] bg-[#081512] p-6 sm:p-10">
+        {/* Nền cực quang chuyển động nhẹ */}
+        <div className="pointer-events-none absolute -inset-[20%] -z-10 opacity-75 blur-[60px]" aria-hidden="true">
+          <span className="absolute left-[-8%] top-[-10%] aspect-square w-[46%] animate-[wallFloat1_16s_ease-in-out_infinite] rounded-full"
+            style={{ background: 'radial-gradient(circle,#2AA37C,transparent 70%)' }} />
+          <span className="absolute right-[-6%] top-[5%] aspect-square w-[40%] animate-[wallFloat2_20s_ease-in-out_infinite] rounded-full"
+            style={{ background: 'radial-gradient(circle,#4FA3FF,transparent 70%)' }} />
+          <span className="absolute bottom-[-16%] left-[30%] aspect-square w-[38%] animate-[wallFloat3_18s_ease-in-out_infinite] rounded-full"
+            style={{ background: 'radial-gradient(circle,#F3C34A,transparent 70%)' }} />
+        </div>
+
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.08] px-3.5 py-1.5 text-[13px] font-semibold text-[#dff3ea]">
+          <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#4ee8a4] shadow-[0_0_0_4px_rgba(78,232,164,.22)]" />
+          Cập nhật trực tiếp hôm nay
+        </span>
+        <h1 className="mt-4 font-display text-[26px] font-extrabold leading-tight tracking-tight text-white sm:text-[34px]">Green Wall — Cộng đồng hành động</h1>
+        <p className="mt-2 max-w-[52ch] text-[15px] text-[#dff3ea]/65">Mọi hành động xanh của cộng đồng hôm nay, gộp lại thành một nhịp đập chung.</p>
+
+        <div className="mt-8 grid items-center gap-8 sm:grid-cols-[auto_1fr]">
+          <div className="relative mx-auto h-44 w-44 flex-none sm:mx-0">
+            <svg viewBox="0 0 176 176" className="h-full w-full -rotate-90">
+              <circle cx="88" cy="88" r="76" fill="none" strokeWidth="14" className="stroke-white/[.08]" />
+              <circle cx="88" cy="88" r="76" fill="none" strokeWidth="14" strokeLinecap="round"
+                stroke="#4ee8a4" style={{ filter: 'drop-shadow(0 0 10px rgba(78,232,164,.55))' }}
+                strokeDasharray={477.5} strokeDashoffset={status === 'ok' ? 0 : 477.5}
+                className="transition-[stroke-dashoffset] duration-[1400ms] ease-out" />
+            </svg>
+            <div className="absolute inset-0 grid place-content-center text-center">
+              <b className="font-display text-[44px] font-extrabold leading-none text-white">{total}</b>
+              <span className="mt-0.5 text-[11.5px] uppercase tracking-wider text-[#dff3ea]/60">Hôm nay</span>
+            </div>
+          </div>
+          <div className="text-center sm:text-left">
+            <b className="block text-[15px] font-bold text-white">
+              {status === 'loading' ? 'Đang tải số liệu cộng đồng…' : `${total} hành động xanh được cộng đồng thực hiện hôm nay`}
+            </b>
+            <p className="mt-1 max-w-[38ch] text-[13.5px] text-[#dff3ea]/62">Từ giảm nhựa, tiết kiệm điện, phân loại rác đến chăm sóc cây — mỗi hành động nhỏ đều được tính.</p>
+            <span className="mt-3.5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-3.5 py-1.5 text-[12.5px] text-[#dff3ea]/65">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+              Không hiển thị bảng xếp hạng cá nhân — chỉ dữ liệu tổng hợp
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {rows && rows.length === 0 && status === 'ok' && (
+        <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-ink-600 shadow-card">Chưa có hành động nào được ghi nhận hôm nay. Hãy là người đầu tiên!</p>
+      )}
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {(rows || []).map((r) => {
+          const meta = WALL_META[r.challenge_id] || WALL_DEFAULT;
+          const label = meta.label || CHALLENGES[r.challenge_id]?.title || r.challenge_id;
+          const pct = Math.round((r.action_count / maxCount) * 100);
+          return (
+            <div key={r.challenge_id} className="relative isolate overflow-hidden rounded-3xl bg-white p-[22px] shadow-card">
+              <span className="pointer-events-none absolute -right-10 -top-10 -z-10 h-[140px] w-[140px] rounded-full opacity-35 blur-[38px]" style={{ background: meta.glow }} />
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[22px]" style={{ background: meta.bg, color: meta.fg }} aria-hidden="true">
+                  {CHALLENGES[r.challenge_id]?.icon || '🌱'}
+                </div>
+                <div className="relative">
+                  <WallRing pct={pct} color={meta.glow} />
+                  <span className="pointer-events-none absolute inset-0 grid place-content-center text-[10px] font-extrabold" style={{ color: meta.fg }}>{pct}%</span>
+                </div>
+              </div>
+              <b className="mt-4 block font-display text-[34px] font-extrabold leading-none tracking-tight">{useCountUp(r.action_count, 1100)}</b>
+              <span className="mt-1 block text-[13.5px] font-medium text-ink-600">{label}</span>
+            </div>
+          );
+        })}
       </div>
-      <div className="text-[11.5px] text-ink-400">🔒 Không hiển thị bảng xếp hạng cá nhân — chỉ dữ liệu tổng hợp cộng đồng.</div>
     </div>
   );
 }
-function WallStat({ num, lbl }) {
-  return (
-    <div className="bg-white rounded-2xl shadow p-3.5">
-      <div className="font-display font-extrabold text-xl text-forest-700">{num}</div>
-      <div className="text-[11.5px] text-ink-600 mt-0.5">{lbl}</div>
-    </div>
-  );
-}
-
-// Đếm số tăng dần (mượt khi số liệu thay đổi)
-function useCountUp(target, ms = 1200) {
-  const [v, setV] = useState(0);
-  const prev = useRef(0);
-  useEffect(() => {
-    const from = prev.current;
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      prev.current = target; setV(target); return undefined;
-    }
-    const t0 = performance.now();
-    let raf;
-    const tick = (t) => {
-      const k = Math.min(1, (t - t0) / ms);
-      setV(Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3))));
-      if (k < 1) raf = requestAnimationFrame(tick); else prev.current = target;
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, ms]);
-  return v;
-}
-
-const LEAF = {
-  s: 'bg-gradient-to-br from-[#F8E3A3] to-[#E8B654] shadow-[0_0_14px_rgba(243,196,107,.55)]',
-  j: 'bg-gradient-to-br from-[#B9EFD5] to-[#4FC79B]',
-  n: 'border-2 border-dashed border-white/30',
-};
 
 function MeterTab() {
-  const [meter, setMeter] = useState(null);
-  const [error, setError] = useState(false);
-  const [filter, setFilter] = useState(null);
+  const [meter, setMeter] = useState(null);   // dữ liệu lớp, hoặc {} nếu chưa có lớp
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
 
   // Lấy số liệu thật của lớp từ Supabase (hàm get_class_meter), tự làm mới mỗi 30 giây
   useEffect(() => {
@@ -763,9 +845,10 @@ function MeterTab() {
     const load = async () => {
       const { data, error: err } = await supabase.rpc('get_class_meter');
       if (!alive) return;
-      if (err) { console.error('get_class_meter:', err.message); setError(true); return; }
-      setMeter((Array.isArray(data) ? data[0] : data) || null);
-      setError(false);
+      if (err) { console.error('get_class_meter:', err.message); setStatus('error'); return; }
+      // Hàm SQL trả về 0 dòng khi tài khoản chưa gán vào lớp nào -> coi là {} thay vì để trống mãi
+      setMeter((Array.isArray(data) ? data[0] : data) || {});
+      setStatus('ok');
     };
     load();
     const timer = setInterval(load, 30000);
@@ -796,18 +879,24 @@ function MeterTab() {
     { id: 'n', label: 'Chưa tham gia', n: nN, dot: 'border-[1.5px] border-dashed border-current' },
   ];
 
-  if (error) {
+  if (status === 'loading') {
+    return <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">Đang tải số liệu của lớp…</div>;
+  }
+  if (status === 'error') {
     return (
       <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">
-        Chưa tải được số liệu của lớp. Hãy kiểm tra đã chạy file SQL <b>get_class_meter</b> trên Supabase chưa.
+        Chưa tải được số liệu của lớp. Hãy kiểm tra đã chạy file SQL <b>get_class_meter</b> trên Supabase chưa,
+        và tài khoản đã đăng nhập đúng chưa.
       </div>
     );
   }
-  if (!meter) {
-    return <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">Đang tải số liệu của lớp…</div>;
-  }
   if (!total) {
-    return <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">Tài khoản của bạn chưa được gán vào lớp nào.</div>;
+    return (
+      <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">
+        Tài khoản của bạn chưa được gán vào lớp nào, nên chưa có số liệu để hiển thị.
+        Hãy nhờ giáo viên/admin gán lớp (cột <b>class_id</b> trong bảng <b>students</b>).
+      </div>
+    );
   }
 
   return (
