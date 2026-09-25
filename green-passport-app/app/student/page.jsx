@@ -26,7 +26,54 @@ function computeDayNumber(startedAt) {
   return Math.min(30, Math.max(1, diffDays + 1));
 }
 
-export default function StudentPage() {
+export default // Ô avatar + tên ở góc phải header, bấm vào hiện menu Đăng xuất
+function UserMenu({ profile, onLogout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const initials = (profile?.full_name || '').split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase();
+
+  useEffect(() => {
+    const onDocClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onEsc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => { document.removeEventListener('click', onDocClick); document.removeEventListener('keydown', onEsc); };
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="true" aria-expanded={open}
+        className="flex items-center gap-2.5 rounded-full bg-white/[.14] py-1.5 pl-1.5 pr-3 transition-colors hover:bg-white/[.22]">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-extrabold ring-2 ring-white/25"
+              style={{ background: 'linear-gradient(145deg,#8FE0BD,#2AA37C)' }}>{initials}</span>
+        <span className="max-w-[120px] truncate text-[13.5px] font-semibold">{profile?.full_name}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+             className={`flex-none opacity-80 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+
+      <div role="menu"
+        className={`absolute right-0 top-[calc(100%+10px)] w-56 rounded-[18px] bg-white p-2 text-ink shadow-[0_20px_40px_-14px_rgba(20,50,40,.35)] transition-all ${open ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1.5 scale-95 opacity-0'}`}>
+        <div className="mb-1.5 flex items-center gap-2.5 border-b border-sand-100 px-2.5 pb-3 pt-2">
+          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full text-sm font-extrabold text-white"
+                style={{ background: 'linear-gradient(145deg,#8FE0BD,#2AA37C)' }}>{initials}</span>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold leading-tight">{profile?.full_name}</div>
+            <div className="text-xs capitalize text-ink-600">{profile?.role || 'Học sinh'}</div>
+          </div>
+        </div>
+        <button type="button" role="menuitem" onClick={onLogout}
+          className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-[13.5px] font-semibold text-[#b3261e] transition-colors hover:bg-[#fdecea]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" />
+          </svg>
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StudentPage() {
   const router = useRouter();
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);   // hàng trong bảng users
@@ -215,8 +262,7 @@ export default function StudentPage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 text-[18px]" aria-hidden="true">🌱</span>
             <span className="font-display text-[17px] font-bold tracking-tight">Green Passport</span>
           </div>
-          <button onClick={handleLogout} aria-label="Đăng xuất"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm transition-colors hover:bg-white/25">⏻</button>
+          <UserMenu profile={profile} onLogout={handleLogout} />
         </div>
       </div>
 
