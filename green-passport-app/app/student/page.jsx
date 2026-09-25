@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import { CHALLENGES, BADGE_DEFS } from '../../lib/challenges';
@@ -724,29 +724,156 @@ function WallStat({ num, lbl }) {
   );
 }
 
+// Đếm số tăng dần (mượt khi số liệu thay đổi)
+function useCountUp(target, ms = 1200) {
+  const [v, setV] = useState(0);
+  const prev = useRef(0);
+  useEffect(() => {
+    const from = prev.current;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      prev.current = target; setV(target); return undefined;
+    }
+    const t0 = performance.now();
+    let raf;
+    const tick = (t) => {
+      const k = Math.min(1, (t - t0) / ms);
+      setV(Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick); else prev.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
+const LEAF = {
+  s: 'bg-gradient-to-br from-[#F8E3A3] to-[#E8B654] shadow-[0_0_14px_rgba(243,196,107,.55)]',
+  j: 'bg-gradient-to-br from-[#B9EFD5] to-[#4FC79B]',
+  n: 'border-2 border-dashed border-white/30',
+};
+
 function MeterTab() {
-  // Có thể thay bằng: select count(*) from students where class_id = X, v.v.
-  const CLASS_METER = { classroom: '10A1', total: 80, joined: 72, actions: 1248, keeping: 58 };
-  const pct = Math.round((CLASS_METER.joined / CLASS_METER.total) * 100);
+  const [meter, setMeter] = useState(null);
+  const [error, setError] = useState(false);
+  const [filter, setFilter] = useState(null);
+
+  // Lấy số liệu thật của lớp từ Supabase (hàm get_class_meter), tự làm mới mỗi 30 giây
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const { data, error: err } = await supabase.rpc('get_class_meter');
+      if (!alive) return;
+      if (err) { console.error('get_class_meter:', err.message); setError(true); return; }
+      setMeter((Array.isArray(data) ? data[0] : data) || null);
+      setError(false);
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
+
+  const total = meter?.total || 0;
+  const joined = Math.min(meter?.joined || 0, total);
+  const actions = meter?.actions || 0;
+  const keeping = Math.min(meter?.keeping || 0, total);
+  const pct = total ? Math.round((joined / total) * 100) : 0;
+  const keepPct = joined ? Math.min(100, Math.round((keeping / joined) * 100)) : 0;
+  const avg = joined ? Math.round(actions / joined) : 0;
+  const remain = Math.max(0, total - joined);
+
+  const actionsShown = useCountUp(actions);
+
+  // Mỗi học sinh là một chiếc lá: vàng = đang duy trì, xanh = đã tham gia, nét đứt = chưa tham gia
+  const nS = keeping;
+  const nJ = Math.max(0, joined - keeping);
+  const nN = Math.max(0, total - nS - nJ);
+  const leaves = [...Array(nS).fill('s'), ...Array(nJ).fill('j'), ...Array(nN).fill('n')];
+  const chips = [
+    { id: 's', label: 'Đang duy trì', n: nS, dot: 'bg-[#E8B654]' },
+    { id: 'j', label: 'Đã tham gia', n: nJ, dot: 'bg-[#4FC79B]' },
+    { id: 'n', label: 'Chưa tham gia', n: nN, dot: 'border-[1.5px] border-dashed border-current' },
+  ];
+
+  if (error) {
+    return (
+      <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">
+        Chưa tải được số liệu của lớp. Hãy kiểm tra đã chạy file SQL <b>get_class_meter</b> trên Supabase chưa.
+      </div>
+    );
+  }
+  if (!meter) {
+    return <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">Đang tải số liệu của lớp…</div>;
+  }
+  if (!total) {
+    return <div className="rounded-3xl bg-white p-6 text-sm text-ink-600 shadow-card">Tài khoản của bạn chưa được gán vào lớp nào.</div>;
+  }
+
   return (
     <div>
-      <SectionTitle icon="🌱" text="Green Meter — Tiến trình của cả lớp" />
-      <div className="bg-white rounded-2xl shadow p-5">
-        <div className="font-display font-bold text-base">Lớp {CLASS_METER.classroom}</div>
-        <div className="grid grid-cols-2 gap-2.5 mt-3.5">
-          <MiniCard icon="🧑‍🤝‍🧑" num={CLASS_METER.total} lbl="Học sinh" />
-          <MiniCard icon="✅" num={CLASS_METER.joined} lbl="Đã tham gia" />
-          <MiniCard icon="🌱" num={CLASS_METER.actions.toLocaleString('vi-VN')} lbl="Hành động xanh" />
-          <MiniCard icon="🔥" num={CLASS_METER.keeping} lbl="Đang duy trì" />
+      <section aria-label={`Khu vườn xanh của lớp ${meter.class_name || ''}`}
+        className="relative grid gap-x-10 gap-y-2 overflow-hidden rounded-[32px] p-6 text-white shadow-[0_24px_50px_-22px_rgba(15,45,36,.7)] sm:p-9 md:grid-cols-[0.9fr_1.1fr]"
+        style={{ background: 'radial-gradient(700px 380px at 78% 20%,#2F7D68 0%,transparent 70%),linear-gradient(160deg,#143A2F,#0F2D24)' }}>
+        <span className="pointer-events-none absolute -bottom-40 -left-32 h-80 w-80 rounded-full bg-[#8FE0BD]/10" />
+
+        <div className="relative flex flex-col">
+          <span className="self-start rounded-full bg-white/15 px-4 py-1 text-sm font-bold">Lớp {meter.class_name || '—'}</span>
+          <div className="mt-5 bg-gradient-to-b from-white to-[#B9EFD5] bg-clip-text font-display text-[clamp(52px,8vw,84px)] font-extrabold leading-none tracking-tighter text-transparent">
+            {actionsShown.toLocaleString('vi-VN')}
+          </div>
+          <div className="mt-1.5 text-lg font-semibold text-[#D9F8E8]">hành động xanh của cả lớp</div>
+          <p className="mt-4 max-w-[36ch] text-[15px] text-white/80">
+            <b className="text-white">{joined} trên {total}</b> bạn đang cùng hành động. Mỗi chiếc lá là một học sinh của lớp.
+          </p>
+          <div className="mt-5">
+            <div className="mb-2 flex justify-between text-[13.5px] font-semibold"><span>Tỷ lệ tham gia</span><span>{pct}%</span></div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-white/[.14]">
+              <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#8FE0BD,#F3D48A)' }} />
+            </div>
+          </div>
+          <p className="mt-auto pt-6 font-semibold text-[#C8F4DD]">“Tôi hành động → Lớp tiến lên.”</p>
         </div>
-        <div className="h-5 rounded-full bg-sand-100 overflow-hidden mt-4.5">
-          <div className="h-full rounded-full flex items-center justify-end pr-2.5 text-white text-[11px] font-bold" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#52B788,#2D6A4F)' }}>{pct}%</div>
+
+        <div className="relative flex flex-col justify-center">
+          <div className="grid grid-cols-10 gap-[clamp(6px,1.2vw,12px)]" role="img"
+               aria-label={`${total} học sinh: ${nS} đang duy trì, ${nJ} đã tham gia, ${nN} chưa tham gia`}>
+            {leaves.map((t, i) => (
+              <div key={i} aria-hidden="true"
+                className={`leaf-in aspect-square rounded-[0_100%_0_100%] transition-[opacity,filter] ${LEAF[t]} ${filter && filter !== t ? 'opacity-20 saturate-50' : ''}`}
+                style={{ animationDelay: `${Math.min(i * 14, 1200)}ms` }} />
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {chips.map((c) => (
+              <button key={c.id} type="button" aria-pressed={filter === c.id} onClick={() => setFilter(filter === c.id ? null : c.id)}
+                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-colors ${filter === c.id ? 'bg-white text-ink' : 'bg-white/10 hover:bg-white/20'}`}>
+                <i className={`block h-3 w-3 rounded-[0_100%_0_100%] ${c.dot}`} />{c.label} <b className="font-extrabold">{c.n}</b>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="text-center font-display font-bold text-forest-700 text-sm mt-4">“Tôi hành động → Lớp tiến lên.”</div>
+      </section>
+
+      <div className="mt-4 grid gap-3.5 md:grid-cols-3">
+        {[
+          { icon: '🔥', bg: 'bg-[#FCF1E1]', num: `${keepPct}%`, lbl: 'bạn tham gia đang giữ streak' },
+          { icon: '🌿', bg: 'bg-[#DFF1F6]', num: `≈ ${avg}`, lbl: 'hành động mỗi bạn tham gia' },
+          { icon: '🎯', bg: 'bg-[#ECE9F8]', num: remain ? `${remain} bạn` : '100%', lbl: remain ? 'nữa là cả lớp cùng hành động' : 'cả lớp cùng hành động!' },
+        ].map((f) => (
+          <div key={f.lbl} className="flex items-center gap-3.5 rounded-[22px] bg-white px-5 py-[18px] shadow-card">
+            <div className={`flex h-11 w-11 flex-none items-center justify-center rounded-[14px] text-[22px] ${f.bg}`} aria-hidden="true">{f.icon}</div>
+            <div>
+              <div className="font-display text-[22px] font-extrabold leading-tight tracking-tight">{f.num}</div>
+              <div className="text-[13px] text-ink-600">{f.lbl}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
+
 function MiniCard({ icon, num, lbl }) {
   return (
     <div className="bg-white rounded-2xl shadow p-3.5">
