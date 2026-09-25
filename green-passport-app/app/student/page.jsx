@@ -709,6 +709,28 @@ const WALL_META = {
 };
 const WALL_DEFAULT = { glow: '#8fa699', bg: '#eef4f1', fg: '#23594a' };
 
+// Đếm số tăng dần (mượt khi số liệu thay đổi) — dùng ở Green Meter và Green Wall
+function useCountUp(target, ms = 1200) {
+  const [v, setV] = useState(0);
+  const prev = useRef(0);
+  useEffect(() => {
+    const from = prev.current;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      prev.current = target; setV(target); return undefined;
+    }
+    const t0 = performance.now();
+    let raf;
+    const tick = (t) => {
+      const k = Math.min(1, (t - t0) / ms);
+      setV(Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick); else prev.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
 function WallRing({ pct, color }) {
   const C = 113; // chu vi vòng tròn r=18
   const ref = useRef(null);
