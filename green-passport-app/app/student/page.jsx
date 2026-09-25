@@ -14,6 +14,18 @@ const TABS = [
   { id: 'profile', ic: '🎖️', label: 'Hồ sơ' },
 ];
 
+// Tính "ngày thứ mấy" của học sinh dựa trên ngày thực tế (started_at) thay vì đếm theo số lần gửi minh chứng.
+// Nhờ vậy dù học sinh gửi bao nhiêu minh chứng trong cùng 1 ngày thực, hệ thống vẫn chỉ tính là 1 ngày;
+// và ngày chỉ thật sự tăng lên khi sang ngày mới theo lịch.
+function computeDayNumber(startedAt) {
+  if (!startedAt) return 1;
+  const start = new Date(startedAt + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((today - start) / 86400000);
+  return Math.min(30, Math.max(1, diffDays + 1));
+}
+
 export default function StudentPage() {
   const router = useRouter();
   const [session, setSession] = useState(null);
@@ -42,7 +54,16 @@ export default function StudentPage() {
     const { data: commits } = await supabase.from('commitments').select('*').eq('student_id', userId);
 
     setProfile(userRow || null);
-    setStudent(studentRow || null);
+    // Đồng bộ current_day theo ngày thực tế (started_at), phòng trường hợp học sinh không mở app trong vài ngày
+    let syncedStudent = studentRow;
+    if (studentRow) {
+      const realDay = computeDayNumber(studentRow.started_at);
+      if (realDay !== studentRow.current_day) {
+        await supabase.from('students').update({ current_day: realDay }).eq('id', userId);
+        syncedStudent = { ...studentRow, current_day: realDay };
+      }
+    }
+    setStudent(syncedStudent || null);
     setDailyActions(actions || []);
     const commitMap = {};
     (commits || []).forEach((c) => { commitMap[c.challenge_id] = c.choice; });
@@ -72,10 +93,18 @@ export default function StudentPage() {
 
   async function submitEvidence() {
     if (recordChoice === null || !student) return;
-    setSubmitting(true);
     const challengeId = recordChId || student.challenge_id || 'plastic';
+    const dayNumber = computeDayNumber(student.started_at); // ngày theo thời gian thực, không phải bộ đếm tự tăng
+
+    // Chặn gửi thêm nếu hôm nay (theo ngày thực) đã có minh chứng rồi — dù đã bấm bao nhiêu lần cũng chỉ tính 1 ngày
+    if (dailyActions.some((d) => d.day_number === dayNumber)) {
+      showToast('Bạn đã ghi nhận cho hôm nay rồi — quay lại vào ngày mai nhé!');
+      setModalOpen(false);
+      return;
+    }
+
+    setSubmitting(true);
     const ch = CHALLENGES[challengeId];
-    const dayNumber = student.current_day || 1;
     const actionText = ch.actions[recordChoice];
 
     const { data: actionRow, error } = await supabase
@@ -113,12 +142,13 @@ export default function StudentPage() {
     }
 
     const newStreak = (student.streak || 0) + 1;
-    const newDay = Math.min(30, dayNumber + 1);
     const newEvidence = (student.evidence_count || 0) + 1;
 
+    // current_day giữ nguyên = dayNumber vừa tính (theo ngày thực) — KHÔNG tự +1 nữa,
+    // ngày chỉ tăng khi computeDayNumber() tính ra ngày mới ở lần tải trang tiếp theo.
     await supabase.from('students').update({
       streak: newStreak,
-      current_day: newDay,
+      current_day: dayNumber,
       evidence_count: newEvidence,
     }).eq('id', session.user.id);
 
