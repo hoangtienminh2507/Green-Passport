@@ -868,6 +868,7 @@ function WallCard({ challengeId, count, maxCount }) {
 function MeterTab() {
   const [meter, setMeter] = useState(null);   // dữ liệu lớp, hoặc {} nếu chưa có lớp
   const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const [filter, setFilter] = useState(null); // lọc theo nhóm lá khi bấm vào chú thích: 's' | 'j' | 'n' | null
 
   // Lấy số liệu thật của lớp từ Supabase (hàm get_class_meter), tự làm mới mỗi 30 giây
   useEffect(() => {
