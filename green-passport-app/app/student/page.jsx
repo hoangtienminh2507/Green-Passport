@@ -809,28 +809,36 @@ function WallTab() {
       )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {(rows || []).map((r) => {
-          const meta = WALL_META[r.challenge_id] || WALL_DEFAULT;
-          const label = meta.label || CHALLENGES[r.challenge_id]?.title || r.challenge_id;
-          const pct = Math.round((r.action_count / maxCount) * 100);
-          return (
-            <div key={r.challenge_id} className="relative isolate overflow-hidden rounded-3xl bg-white p-[22px] shadow-card">
-              <span className="pointer-events-none absolute -right-10 -top-10 -z-10 h-[140px] w-[140px] rounded-full opacity-35 blur-[38px]" style={{ background: meta.glow }} />
-              <div className="flex items-center justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[22px]" style={{ background: meta.bg, color: meta.fg }} aria-hidden="true">
-                  {CHALLENGES[r.challenge_id]?.icon || '🌱'}
-                </div>
-                <div className="relative">
-                  <WallRing pct={pct} color={meta.glow} />
-                  <span className="pointer-events-none absolute inset-0 grid place-content-center text-[10px] font-extrabold" style={{ color: meta.fg }}>{pct}%</span>
-                </div>
-              </div>
-              <b className="mt-4 block font-display text-[34px] font-extrabold leading-none tracking-tight">{useCountUp(r.action_count, 1100)}</b>
-              <span className="mt-1 block text-[13.5px] font-medium text-ink-600">{label}</span>
-            </div>
-          );
-        })}
+        {(rows || []).map((r) => (
+          <WallCard key={r.challenge_id} challengeId={r.challenge_id} count={r.action_count} maxCount={maxCount} />
+        ))}
       </div>
+    </div>
+  );
+}
+
+// Thẻ riêng cho từng loại hành động trên Green Wall.
+// Tách thành component riêng để useCountUp (một Hook) luôn được gọi đúng 1 lần cho mỗi thẻ,
+// dù danh sách "rows" thay đổi độ dài khi dữ liệu tải xong hoặc cập nhật.
+function WallCard({ challengeId, count, maxCount }) {
+  const meta = WALL_META[challengeId] || WALL_DEFAULT;
+  const label = meta.label || CHALLENGES[challengeId]?.title || challengeId;
+  const pct = Math.round((count / maxCount) * 100);
+  const shown = useCountUp(count, 1100);
+  return (
+    <div className="relative isolate overflow-hidden rounded-3xl bg-white p-[22px] shadow-card">
+      <span className="pointer-events-none absolute -right-10 -top-10 -z-10 h-[140px] w-[140px] rounded-full opacity-35 blur-[38px]" style={{ background: meta.glow }} />
+      <div className="flex items-center justify-between">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[22px]" style={{ background: meta.bg, color: meta.fg }} aria-hidden="true">
+          {CHALLENGES[challengeId]?.icon || '🌱'}
+        </div>
+        <div className="relative">
+          <WallRing pct={pct} color={meta.glow} />
+          <span className="pointer-events-none absolute inset-0 grid place-content-center text-[10px] font-extrabold" style={{ color: meta.fg }}>{pct}%</span>
+        </div>
+      </div>
+      <b className="mt-4 block font-display text-[34px] font-extrabold leading-none tracking-tight">{shown}</b>
+      <span className="mt-1 block text-[13.5px] font-medium text-ink-600">{label}</span>
     </div>
   );
 }
