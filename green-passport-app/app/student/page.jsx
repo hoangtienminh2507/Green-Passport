@@ -94,14 +94,7 @@ export default function StudentPage() {
   async function submitEvidence() {
     if (recordChoice === null || !student) return;
     const challengeId = recordChId || student.challenge_id || 'plastic';
-    const dayNumber = computeDayNumber(student.started_at); // ngày theo thời gian thực, không phải bộ đếm tự tăng
-
-    // Chặn gửi thêm nếu hôm nay (theo ngày thực) đã có minh chứng rồi — dù đã bấm bao nhiêu lần cũng chỉ tính 1 ngày
-    if (dailyActions.some((d) => d.day_number === dayNumber)) {
-      showToast('Bạn đã ghi nhận cho hôm nay rồi — quay lại vào ngày mai nhé!');
-      setModalOpen(false);
-      return;
-    }
+    const dayNumber = computeDayNumber(student.started_at); // ngày theo thời gian thực, dùng để hiển thị đúng ô trong hành trình 30 ngày
 
     setSubmitting(true);
     const ch = CHALLENGES[challengeId];
@@ -141,18 +134,23 @@ export default function StudentPage() {
       }
     }
 
-    const newStreak = (student.streak || 0) + 1;
+    // Mọi lần gửi đều được tính vào tổng số minh chứng (và do đó vẫn cộng vào Green Wall / Green Meter),
+    // nhưng streak chỉ tăng thêm 1 lần duy nhất cho mỗi ngày thực — gửi thêm trong cùng ngày không cộng dồn streak.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const alreadyCountedToday = student.last_streak_date === todayStr;
+    const newStreak = alreadyCountedToday ? (student.streak || 0) : (student.streak || 0) + 1;
     const newEvidence = (student.evidence_count || 0) + 1;
 
     // current_day giữ nguyên = dayNumber vừa tính (theo ngày thực) — KHÔNG tự +1 nữa,
     // ngày chỉ tăng khi computeDayNumber() tính ra ngày mới ở lần tải trang tiếp theo.
     await supabase.from('students').update({
       streak: newStreak,
+      last_streak_date: todayStr,
       current_day: dayNumber,
       evidence_count: newEvidence,
     }).eq('id', session.user.id);
 
-    const earnedBadge = BADGE_DEFS.find((b) => b.needStreak === newStreak);
+    const earnedBadge = alreadyCountedToday ? null : BADGE_DEFS.find((b) => b.needStreak === newStreak);
     if (earnedBadge) {
       await supabase.from('student_badges').upsert({
         student_id: session.user.id,
@@ -167,7 +165,11 @@ export default function StudentPage() {
     setPhotoPreview(null);
     setSubmitting(false);
     await loadAll(session.user.id);
-    showToast(earnedBadge ? `Chúc mừng! Bạn vừa đạt huy hiệu "${earnedBadge.name}"` : 'Ngày hôm nay đã được ghi nhận!');
+    showToast(earnedBadge
+      ? `Chúc mừng! Bạn vừa đạt huy hiệu "${earnedBadge.name}"`
+      : alreadyCountedToday
+        ? 'Đã ghi nhận thêm minh chứng cho hôm nay!'
+        : 'Ngày hôm nay đã được ghi nhận!');
   }
 
   async function setCommitment(challengeId, choice) {
