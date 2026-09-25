@@ -865,6 +865,14 @@ function WallCard({ challengeId, count, maxCount }) {
   );
 }
 
+// Bảng màu cho từng "chiếc lá" trong Green Meter, khớp với màu chấm tròn trong chú thích (chips) bên dưới:
+// 's' = đang duy trì (vàng), 'j' = đã tham gia (xanh), 'n' = chưa tham gia (viền đứt, mờ)
+const LEAF = {
+  s: 'bg-[#E8B654]',
+  j: 'bg-[#4FC79B]',
+  n: 'border border-dashed border-white/30 bg-white/[.06]',
+};
+
 function MeterTab() {
   const [meter, setMeter] = useState(null);   // dữ liệu lớp, hoặc {} nếu chưa có lớp
   const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
