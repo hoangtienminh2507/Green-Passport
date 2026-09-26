@@ -95,8 +95,6 @@ export default function StudentPage() {
   const [toast, setToast] = useState('');
   const [openDay, setOpenDay] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resendMsg, setResendMsg] = useState('');
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2600); };
 
@@ -124,12 +122,6 @@ export default function StudentPage() {
         .select()
         .single();
       studentRow = newStudentRow;
-      // Hồ sơ vừa tạo lần đầu — gửi email xác nhận ngay
-      fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      }).catch(() => {});
     }
 
     const { data: actions } = await supabase.from('daily_actions').select('*').eq('student_id', userId).order('day_number');
@@ -177,24 +169,6 @@ export default function StudentPage() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace('/');
-  }
-
-  async function handleResendConfirmation() {
-    if (!session) return;
-    setResending(true);
-    setResendMsg('');
-    try {
-      const res = await fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: session.user.id }),
-      });
-      const data = await res.json();
-      setResendMsg(res.ok ? 'Đã gửi lại email xác nhận!' : ('Lỗi: ' + (data.error || 'không gửi được')));
-    } catch (e) {
-      setResendMsg('Lỗi: ' + e.message);
-    }
-    setResending(false);
   }
 
   function handlePhotoChange(e) {
@@ -310,25 +284,6 @@ export default function StudentPage() {
       </div>
     );
   }
-  if (!student.email_confirmed) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-6">
-        <div className="text-4xl">📩</div>
-        <div className="text-lg font-bold">Vui lòng xác nhận email để tiếp tục</div>
-        <div className="text-sm text-ink-600 max-w-sm">
-          Chúng tôi vừa gửi một email xác nhận tới hộp thư của bạn. Mở email và bấm nút "Xác nhận tài khoản" để bắt đầu dùng Green Passport.
-          Nhớ kiểm tra cả mục Spam/Quảng cáo nếu chưa thấy email.
-        </div>
-        <button onClick={handleResendConfirmation} disabled={resending}
-          className="mt-2 bg-leaf-500 text-forest-900 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50">
-          {resending ? 'Đang gửi...' : '✉️ Gửi lại email xác nhận'}
-        </button>
-        {resendMsg && <div className="text-xs text-ink-600">{resendMsg}</div>}
-        <button onClick={handleLogout} className="text-xs text-ink-400 underline mt-2">Đăng xuất</button>
-      </div>
-    );
-  }
-
   const challengeId = student.challenge_id || 'plastic';
   const ch = challenges.find((c) => c.id === challengeId) || FALLBACK_CH;
   const progress = Math.round(((student.current_day || 1) / 30) * 100);
