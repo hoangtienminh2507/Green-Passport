@@ -56,6 +56,17 @@ export default function LoginPage() {
     router.push('/student');
   }
 
+  async function handleGoogleLogin() {
+    setError('');
+    // redirectTo trỏ thẳng về /student — sau khi đăng nhập Google xong, học sinh vào thẳng app,
+    // không quay lại trang đăng nhập này. Hồ sơ users/students được tự tạo ở /student nếu là lần đầu.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/student` },
+    });
+    if (error) setError(error.message);
+  }
+
   if (checkingSession) {
     return <div className="min-h-screen flex items-center justify-center text-ink-600">Đang kiểm tra đăng nhập...</div>;
   }
@@ -111,6 +122,24 @@ export default function LoginPage() {
             {loading ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
           </button>
         </form>
+
+        <div className="flex items-center gap-3 my-4">
+          <span className="flex-1 h-px bg-sand-100" />
+          <span className="text-[11px] font-semibold text-ink-400">HOẶC</span>
+          <span className="flex-1 h-px bg-sand-100" />
+        </div>
+
+        <button
+          type="button" onClick={handleGoogleLogin}
+          className="w-full flex items-center justify-center gap-2.5 border border-sand-100 rounded-xl py-3 text-sm font-bold text-ink hover:bg-sand-50 transition-colors">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.1 17.7 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.6H24v9.1h12.6c-.5 2.9-2.2 5.4-4.7 7l7.6 5.9c4.4-4.1 7-10.1 7-17.4z"/>
+            <path fill="#FBBC05" d="M10.5 19.3c-.5 1.5-.8 3.1-.8 4.7s.3 3.2.8 4.7l-7.9 6.1C.9 31.4 0 27.8 0 24s.9-7.4 2.6-10.8l7.9 6.1z"/>
+            <path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.6l-7.6-5.9c-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.6-3.6-13.5-8.9l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
+          </svg>
+          Đăng nhập nhanh bằng Google
+        </button>
 
         <button
           onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }}
