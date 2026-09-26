@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import { CHALLENGES, BADGE_DEFS } from '../../lib/challenges';
+import { BADGE_DEFS } from '../../lib/challenges';
 
 const TABS = [
   { id: 'home', ic: '🏠', label: 'Trang chủ' },
@@ -13,6 +13,9 @@ const TABS = [
   { id: 'meter', ic: '📊', label: 'Green Meter' },
   { id: 'profile', ic: '🎖️', label: 'Hồ sơ' },
 ];
+
+// Thử thách mặc định dùng tạm khi chưa tải xong / không tìm thấy trong danh sách từ Supabase
+const FALLBACK_CH = { id: null, icon: '🌱', name: 'Chưa rõ', title: '', baselineLabel: '', unit: '', baseline: '-', target: '-', actions: [] };
 
 // Tính "ngày thứ mấy" của học sinh dựa trên ngày thực tế (started_at) thay vì đếm theo số lần gửi minh chứng.
 // Nhờ vậy dù học sinh gửi bao nhiêu minh chứng trong cùng 1 ngày thực, hệ thống vẫn chỉ tính là 1 ngày;
@@ -80,6 +83,7 @@ export default function StudentPage() {
   const [student, setStudent] = useState(null);   // hàng trong bảng students
   const [dailyActions, setDailyActions] = useState([]); // toàn bộ daily_actions của học sinh
   const [commitments, setCommitments] = useState({});   // { challenge_id: 'in' | 'skip' }
+  const [challenges, setChallenges] = useState([]);      // danh sách thử thách lấy trực tiếp từ Supabase (đồng bộ khi giáo viên sửa)
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('home');
   const [modalOpen, setModalOpen] = useState(false);
@@ -99,8 +103,21 @@ export default function StudentPage() {
     const { data: studentRow } = await supabase.from('students').select('*').eq('id', userId).single();
     const { data: actions } = await supabase.from('daily_actions').select('*').eq('student_id', userId).order('day_number');
     const { data: commits } = await supabase.from('commitments').select('*').eq('student_id', userId);
+    const { data: chRows } = await supabase.from('challenges').select('*').order('name');
 
     setProfile(userRow || null);
+    // Ánh xạ tên cột Supabase (baseline_label) sang tên field giao diện đang dùng (baselineLabel)
+    setChallenges((chRows || []).map((c) => ({
+      id: c.id,
+      icon: c.icon || '🌱',
+      name: c.name,
+      title: c.title,
+      baselineLabel: c.baseline_label,
+      unit: c.unit,
+      baseline: c.baseline,
+      target: c.target,
+      actions: c.actions || [],
+    })));
     // Đồng bộ current_day theo ngày thực tế (started_at), phòng trường hợp học sinh không mở app trong vài ngày
     let syncedStudent = studentRow;
     if (studentRow) {
@@ -144,7 +161,7 @@ export default function StudentPage() {
     const dayNumber = computeDayNumber(student.started_at); // ngày theo thời gian thực, dùng để hiển thị đúng ô trong hành trình 30 ngày
 
     setSubmitting(true);
-    const ch = CHALLENGES[challengeId];
+    const ch = challenges.find((c) => c.id === challengeId) || FALLBACK_CH;
     const actionText = ch.actions[recordChoice];
 
     const { data: actionRow, error } = await supabase
@@ -246,7 +263,7 @@ export default function StudentPage() {
   }
 
   const challengeId = student.challenge_id || 'plastic';
-  const ch = CHALLENGES[challengeId];
+  const ch = challenges.find((c) => c.id === challengeId) || FALLBACK_CH;
   const progress = Math.round(((student.current_day || 1) / 30) * 100);
   const today = dailyActions.find((d) => d.day_number === student.current_day);
   const doneToday = !!today;
@@ -281,16 +298,17 @@ export default function StudentPage() {
 
           {tab === 'home' && (
             <HomeTab profile={profile} student={student} progress={progress} commitments={commitments}
-              dailyActions={dailyActions} onGoAuction={() => setTab('auction')} />
+              dailyActions={dailyActions} challenges={challenges} onGoAuction={() => setTab('auction')} />
           )}
           {tab === 'journey' && (
             <JourneyTab student={student} dayMap={dayMap} openDay={openDay} setOpenDay={setOpenDay} />
           )}
           {tab === 'auction' && (
             <AuctionTab commitments={commitments} setCommitment={setCommitment} student={student} dailyActions={dailyActions}
+              challenges={challenges}
               onRecord={(id) => { setRecordChId(id); setRecordChoice(null); setModalOpen(true); }} />
           )}
-          {tab === 'wall' && <WallTab />}
+          {tab === 'wall' && <WallTab challenges={challenges} />}
           {tab === 'meter' && <MeterTab />}
           {tab === 'profile' && <ProfileTab profile={profile} student={student} onLogout={handleLogout} />}
         </div>
@@ -308,7 +326,7 @@ export default function StudentPage() {
 
       {modalOpen && (
         <RecordModal
-          ch={CHALLENGES[recordChId] || ch} dayNumber={student.current_day} recordChoice={recordChoice} setRecordChoice={setRecordChoice}
+          ch={challenges.find((c) => c.id === recordChId) || ch} dayNumber={student.current_day} recordChoice={recordChoice} setRecordChoice={setRecordChoice}
           note={note} setNote={setNote}
           photoPreview={photoPreview} onPhotoChange={handlePhotoChange}
           onClose={() => { setModalOpen(false); setPhotoFile(null); setPhotoPreview(null); }}
@@ -327,8 +345,8 @@ export default function StudentPage() {
 
 /* ---------------- Sub-components ---------------- */
 
-function HomeTab({ profile, student, progress, commitments, dailyActions, onGoAuction }) {
-  const joined = Object.values(CHALLENGES).filter((c) => commitments[c.id] === 'in');
+function HomeTab({ profile, student, progress, commitments, dailyActions, challenges, onGoAuction }) {
+  const joined = challenges.filter((c) => commitments[c.id] === 'in');
   const countOf = (id) => dailyActions.filter((d) => d.challenge_id === id).length;
   const initials = (profile.full_name || '').split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase();
   const streak = student.streak || 0;
@@ -640,10 +658,15 @@ function Legend({ swatch, label }) {
   return <span className="inline-flex items-center gap-2"><span className={`h-3.5 w-3.5 rounded-[5px] ${swatch}`} />{label}</span>;
 }
 
-function AuctionTab({ commitments, setCommitment, student, dailyActions, onRecord }) {
-  const list = Object.values(CHALLENGES);
-  const [selId, setSelId] = useState(list[0].id);
-  const ch = CHALLENGES[selId];
+function AuctionTab({ commitments, setCommitment, student, dailyActions, onRecord, challenges }) {
+  const list = challenges;
+  const [selId, setSelId] = useState(list[0]?.id || null);
+
+  if (!list.length) {
+    return <div className="rounded-[28px] bg-white p-6 text-sm text-ink-600 shadow-card">Chưa có thử thách nào — giáo viên cần thêm thử thách trước ở trang quản trị.</div>;
+  }
+
+  const ch = list.find((c) => c.id === selId) || list[0];
   const choice = commitments[ch.id];
   const joinedCount = list.filter((c) => commitments[c.id] === 'in').length;
   const total = 80, in_ = 62;
@@ -827,7 +850,7 @@ function WallRing({ pct, color }) {
   );
 }
 
-function WallTab() {
+function WallTab({ challenges }) {
   const [rows, setRows] = useState(null); // null = đang tải, [] = chưa có hành động nào hôm nay
   const [status, setStatus] = useState('loading');
   const total = useCountUp(rows ? rows.reduce((s, r) => s + r.action_count, 0) : 0, 1400);
@@ -910,7 +933,7 @@ function WallTab() {
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {(rows || []).map((r) => (
-          <WallCard key={r.challenge_id} challengeId={r.challenge_id} count={r.action_count} maxCount={maxCount} />
+          <WallCard key={r.challenge_id} challengeId={r.challenge_id} count={r.action_count} maxCount={maxCount} challenges={challenges} />
         ))}
       </div>
     </div>
@@ -920,9 +943,10 @@ function WallTab() {
 // Thẻ riêng cho từng loại hành động trên Green Wall.
 // Tách thành component riêng để useCountUp (một Hook) luôn được gọi đúng 1 lần cho mỗi thẻ,
 // dù danh sách "rows" thay đổi độ dài khi dữ liệu tải xong hoặc cập nhật.
-function WallCard({ challengeId, count, maxCount }) {
+function WallCard({ challengeId, count, maxCount, challenges }) {
   const meta = WALL_META[challengeId] || WALL_DEFAULT;
-  const label = meta.label || CHALLENGES[challengeId]?.title || challengeId;
+  const chData = challenges.find((c) => c.id === challengeId);
+  const label = meta.label || chData?.title || challengeId;
   const pct = Math.round((count / maxCount) * 100);
   const shown = useCountUp(count, 1100);
   return (
@@ -930,7 +954,7 @@ function WallCard({ challengeId, count, maxCount }) {
       <span className="pointer-events-none absolute -right-10 -top-10 -z-10 h-[140px] w-[140px] rounded-full opacity-35 blur-[38px]" style={{ background: meta.glow }} />
       <div className="flex items-center justify-between">
         <div className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[22px]" style={{ background: meta.bg, color: meta.fg }} aria-hidden="true">
-          {CHALLENGES[challengeId]?.icon || '🌱'}
+          {chData?.icon || '🌱'}
         </div>
         <div className="relative">
           <WallRing pct={pct} color={meta.glow} />
