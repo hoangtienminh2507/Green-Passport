@@ -98,9 +98,23 @@ export default function StudentPage() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2600); };
 
-  const loadAll = useCallback(async (userId) => {
-    const { data: userRow } = await supabase.from('users').select('*').eq('id', userId).single();
-    const { data: studentRow } = await supabase.from('students').select('*').eq('id', userId).single();
+  const loadAll = useCallback(async (user) => {
+    const userId = user.id;
+    // .maybeSingle() thay vì .single(): không báo lỗi khi chưa có hồ sơ (trường hợp đăng nhập Google lần đầu)
+    let { data: userRow } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+    let { data: studentRow } = await supabase.from('students').select('*').eq('id', userId).maybeSingle();
+
+    // Tài khoản đăng nhập Google lần đầu, chưa từng qua form Đăng ký — tự tạo hồ sơ mặc định
+    if (!userRow) {
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'Học sinh';
+      const { data: newUser } = await supabase.from('users').insert({ id: userId, full_name: fullName, role: 'student' }).select().single();
+      userRow = newUser;
+    }
+    if (!studentRow) {
+      const { data: newStudent } = await supabase.from('students').insert({ id: userId, streak: 0, evidence_count: 0, current_day: 1 }).select().single();
+      studentRow = newStudent;
+    }
+
     const { data: actions } = await supabase.from('daily_actions').select('*').eq('student_id', userId).order('day_number');
     const { data: commits } = await supabase.from('commitments').select('*').eq('student_id', userId);
     const { data: chRows } = await supabase.from('challenges').select('*').order('name');
@@ -139,7 +153,7 @@ export default function StudentPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) { router.replace('/'); return; }
       setSession(data.session);
-      loadAll(data.session.user.id);
+      loadAll(data.session.user);
     });
   }, [router, loadAll]);
 
