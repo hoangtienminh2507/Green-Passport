@@ -220,19 +220,11 @@ export default function TeacherPage() {
           )}
           {tab === 'evidence' && <EvidenceTab pendingActions={pendingActions} challengesMap={challengesMap} fallbackCh={fallbackCh} onConfirm={confirmAction} onRequestMore={requestMoreAction} />}
           {tab === 'challenges' && (
-            <ChallengesTab challenges={challenges} students={students} onEdit={(ch) => setChallengeModal(ch)} onAddNew={() => setChallengeModal('new')} />
+            <ChallengesTab challenges={challenges} students={students} onSave={saveChallenge} onDelete={deleteChallenge} />
           )}
         </div>
       </div>
 
-      {challengeModal && (
-        <ChallengeFormModal
-          initial={challengeModal === 'new' ? null : challengeModal}
-          onClose={() => setChallengeModal(null)}
-          onSave={saveChallenge}
-          onDelete={deleteChallenge}
-        />
-      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-forest-800 text-white px-5 py-3 rounded-full text-sm font-semibold shadow-lg">✅ {toast}</div>
@@ -411,43 +403,201 @@ function EvidenceTab({ pendingActions, challengesMap, fallbackCh, onConfirm, onR
   );
 }
 
-function ChallengesTab({ challenges, students, onEdit, onAddNew }) {
+const CH_TINTS = ['bg-sand-100', 'bg-mint-100', 'bg-leaf-100', 'bg-[#F1ECFB]', 'bg-[#EEF8E2]'];
+
+function ChallengesTab({ challenges, students, onSave, onDelete }) {
+  const [selectedId, setSelectedId] = useState(challenges[0]?.id || null);
+  const [creatingNew, setCreatingNew] = useState(false);
+
+  const joinedCount = (chId) => students.filter((s) => (s.challenge_id || null) === chId).length;
+  const totalJoined = challenges.reduce((sum, c) => sum + joinedCount(c.id), 0);
+  const needsCount = challenges.filter((c) => joinedCount(c.id) === 0).length;
+  const selected = creatingNew ? null : challenges.find((c) => c.id === selectedId) || null;
+
+  // Nếu thử thách đang chọn không còn tồn tại nữa (vừa bị xoá), tự chọn lại thử thách đầu tiên
+  useEffect(() => {
+    if (!creatingNew && selectedId && !challenges.some((c) => c.id === selectedId)) {
+      setSelectedId(challenges[0]?.id || null);
+    }
+  }, [challenges, selectedId, creatingNew]);
+
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <SectionTitle text="🎯 Dashboard theo thử thách" />
-        <button onClick={onAddNew} className="bg-forest-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg whitespace-nowrap">+ Thêm thử thách</button>
+      <div className="flex flex-wrap items-start justify-between gap-3.5 mb-1">
+        <div>
+          <SectionTitle text="🎯 Dashboard theo thử thách" />
+          <p className="text-[13.5px] text-ink-600 mt-1">Chọn 1 thử thách bên trái để sửa ngay bên phải — không cần cuộn qua danh sách dài.</p>
+        </div>
+        <button onClick={() => { setCreatingNew(true); setSelectedId(null); }}
+          className="flex-none inline-flex items-center gap-1.5 bg-gradient-to-br from-leaf-500 to-forest-700 text-white text-[13.5px] font-bold px-4 py-2.5 rounded-xl whitespace-nowrap shadow-[0_10px_22px_-10px_rgba(35,143,110,.55)]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          Thêm thử thách
+        </button>
       </div>
-      <p className="text-sm text-ink-600 mb-4">Bấm vào một thẻ để sửa hoặc xoá. Thay đổi ở đây áp dụng ngay cho toàn hệ thống.</p>
-      <div className="grid md:grid-cols-2 gap-3.5">
-        {challenges.length === 0 && <div className="text-sm text-ink-600">Chưa có thử thách nào.</div>}
-        {challenges.map((ch) => {
-          const count = students.filter((s) => (s.challenge_id || null) === ch.id).length;
-          return (
-            <div key={ch.id} onClick={() => onEdit(ch)}
-              className="bg-white rounded-2xl shadow p-4.5 cursor-pointer hover:ring-2 hover:ring-leaf-500 transition">
-              <div className="flex items-start justify-between gap-2">
-                <span className="inline-flex items-center gap-1 bg-leaf-100 text-forest-700 text-[11.5px] font-bold px-2.5 py-1 rounded-full">{ch.icon} {ch.name}</span>
-                <span className="text-[11px] text-ink-400 font-semibold">Sửa ✎</span>
-              </div>
-              <div className="font-display font-bold text-sm mt-2">{ch.title}</div>
-              <div className="flex justify-between text-[12.5px] py-1.5 border-b border-dashed border-sand-100 mt-2">
-                <span className="text-ink-600 font-semibold">Dữ liệu ban đầu</span><span className="font-bold">{ch.baseline} {ch.unit}</span>
-              </div>
-              <div className="flex justify-between text-[12.5px] py-1.5 border-b border-dashed border-sand-100">
-                <span className="text-ink-600 font-semibold">Mục tiêu</span><span className="font-bold">≤ {ch.target} {ch.unit}</span>
-              </div>
-              <div className="flex justify-between text-[12.5px] py-1.5">
-                <span className="text-ink-600 font-semibold">Học sinh tham gia</span><span className="font-bold">{count}</span>
-              </div>
-            </div>
-          );
-        })}
+
+      <div className="flex flex-wrap gap-2 my-4">
+        <span className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white shadow-card text-[13px] font-semibold">📋 <b className="font-extrabold text-[14.5px]">{challenges.length}</b> thử thách</span>
+        <span className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white shadow-card text-[13px] font-semibold">🙋 <b className="font-extrabold text-[14.5px]">{totalJoined}</b> học sinh đã tham gia</span>
+        {needsCount > 0 && (
+          <span className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-honey-soft text-[#A8691F] text-[13px] font-semibold">⚠️ <b className="font-extrabold text-[14.5px]">{needsCount}</b> chưa có ai tham gia</span>
+        )}
       </div>
+
+      <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)] items-start">
+        <div className="bg-white rounded-[22px] p-2 shadow-card max-h-[560px] overflow-y-auto" role="listbox" aria-label="Danh sách thử thách">
+          {challenges.length === 0 && !creatingNew && <div className="text-sm text-ink-600 p-3">Chưa có thử thách nào.</div>}
+          {challenges.map((ch, i) => {
+            const n = joinedCount(ch.id);
+            const active = !creatingNew && ch.id === selectedId;
+            return (
+              <button key={ch.id} type="button" role="option" aria-selected={active}
+                onClick={() => { setCreatingNew(false); setSelectedId(ch.id); }}
+                className={`w-full flex items-center gap-2.5 p-2.5 rounded-[15px] text-left transition-colors ${active ? 'bg-leaf-100' : 'hover:bg-sand-50'}`}>
+                <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-none ${CH_TINTS[i % CH_TINTS.length]}`}>{ch.icon}</span>
+                <span className="flex-1 min-w-0">
+                  <b className="block text-[13.5px] font-bold truncate">{ch.title || '(Chưa có tiêu đề)'}</b>
+                  <span className="block text-[11.5px] text-ink-600 truncate">{ch.name}</span>
+                </span>
+                <span className={`w-[9px] h-[9px] rounded-full flex-none ${n ? 'bg-leaf-500' : 'bg-amber-400'}`} title={n ? 'Đã có học sinh tham gia' : 'Chưa có học sinh'} />
+              </button>
+            );
+          })}
+        </div>
+
+        <ChallengePanel
+          key={creatingNew ? 'new' : selectedId}
+          initial={selected}
+          joinedCount={selected ? joinedCount(selected.id) : 0}
+          onSave={async (payload, isNew) => { await onSave(payload, isNew); if (isNew) { setCreatingNew(false); setSelectedId(payload.id); } }}
+          onDelete={async (id) => { await onDelete(id); setCreatingNew(false); setSelectedId(null); }}
+          onCancelNew={() => { setCreatingNew(false); setSelectedId(challenges[0]?.id || null); }}
+        />
+      </div>
+
       <div className="text-[11.5px] text-ink-400 mt-4">
         Ghi chú: số liệu "hiện tại" cần khảo sát thật (post-survey) để tính chính xác — hiện đang hiển thị số học sinh cam kết theo thử thách.
       </div>
     </div>
+  );
+}
+
+function ChallengePanel({ initial, joinedCount, onSave, onDelete, onCancelNew }) {
+  const isNew = !initial;
+  const [id, setId] = useState(initial?.id || '');
+  const [icon, setIcon] = useState(initial?.icon || '🌱');
+  const [name, setName] = useState(initial?.name || '');
+  const [title, setTitle] = useState(initial?.title || '');
+  const [baselineLabel, setBaselineLabel] = useState(initial?.baseline_label || '');
+  const [unit, setUnit] = useState(initial?.unit || '');
+  const [baseline, setBaseline] = useState(initial?.baseline ?? '');
+  const [target, setTarget] = useState(initial?.target ?? '');
+  const [actionsText, setActionsText] = useState((initial?.actions || []).join('\n'));
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [savedTick, setSavedTick] = useState(false);
+
+  // Hướng mục tiêu (tăng/giảm) suy trực tiếp từ 2 số, không cần lưu thêm cột trong Supabase
+  const goingDown = Number(target) < Number(baseline);
+
+  async function handleSave() {
+    if (!id.trim() || !name.trim()) return;
+    setSaving(true);
+    await onSave({
+      id: id.trim(),
+      icon: icon.trim() || '🌱',
+      name: name.trim(),
+      title: title.trim(),
+      baseline_label: baselineLabel.trim(),
+      unit: unit.trim(),
+      baseline: baseline === '' ? null : Number(baseline),
+      target: target === '' ? null : Number(target),
+      actions: actionsText.split('\n').map((s) => s.trim()).filter(Boolean),
+    }, isNew);
+    setSaving(false);
+    if (!isNew) { setSavedTick(true); setTimeout(() => setSavedTick(false), 1500); }
+  }
+
+  if (!initial && !isNew) return null; // an toàn: chưa có gì để hiển thị
+
+  return (
+    <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <input value={icon} onChange={(e) => setIcon(e.target.value)} aria-label="Icon"
+            className="w-11 h-11 flex-none rounded-2xl bg-sand-100 text-xl text-center border-0 focus:ring-2 focus:ring-leaf-500" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên nhóm (vd: Energy Detective)"
+            className="min-w-0 flex-1 font-bold text-sm border-0 bg-transparent px-0 focus:ring-0" />
+        </div>
+        {!isNew && (
+          confirmDelete ? (
+            <div className="flex-none flex items-center gap-1.5">
+              <button onClick={() => onDelete(initial.id)} className="text-[12px] font-bold text-white bg-red-600 px-2.5 py-1.5 rounded-lg">Xác nhận xoá</button>
+              <button onClick={() => setConfirmDelete(false)} className="text-[12px] font-bold text-ink-600 bg-sand-100 px-2.5 py-1.5 rounded-lg">Huỷ</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} className="flex-none text-[12.5px] font-bold text-red-600 bg-red-50 px-3 py-2 rounded-[11px]">🗑️ Xoá</button>
+          )
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 mt-4">
+        {isNew && (
+          <Field label="Mã định danh (id, không dấu, không trùng)">
+            <input value={id} onChange={(e) => setId(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+              placeholder="vd: energy" className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+          </Field>
+        )}
+        <Field label={isNew ? 'Tiêu đề hiển thị' : 'Tiêu đề thử thách'}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ví dụ: Mỗi người một bình nước"
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+        </Field>
+        <Field label="Mô tả chỉ số">
+          <input value={baselineLabel} onChange={(e) => setBaselineLabel(e.target.value)} placeholder="vd: Số chai nhựa dùng 1 lần / ngày"
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+        </Field>
+        <Field label="Đơn vị">
+          <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="lần/ngày, %..."
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+        </Field>
+        <Field label="Số liệu ban đầu">
+          <input type="number" value={baseline} onChange={(e) => setBaseline(e.target.value)}
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+        </Field>
+        <Field label="Mục tiêu">
+          <input type="number" value={target} onChange={(e) => setTarget(e.target.value)}
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm" />
+        </Field>
+      </div>
+
+      {baseline !== '' && target !== '' && (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 px-4 py-3 rounded-2xl bg-sand-50">
+          <div><span className="block text-[11px] text-ink-600">Ban đầu</span><b className="text-lg font-extrabold">{baseline}<em className="not-italic text-[11.5px] font-medium text-ink-600 ml-1">{unit}</em></b></div>
+          <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-leaf-500">→</span>
+          <div className="text-right"><span className="block text-[11px] text-ink-600">Mục tiêu</span><b className="text-lg font-extrabold text-forest-700">{goingDown ? '≤ ' : '≥ '}{target}<em className="not-italic text-[11.5px] font-medium text-ink-600 ml-1">{unit}</em></b></div>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <Field label="Danh sách hành động gợi ý (mỗi dòng 1 hành động)">
+          <textarea rows={3} value={actionsText} onChange={(e) => setActionsText(e.target.value)}
+            className="w-full border border-sand-100 rounded-xl px-3 py-2.5 text-sm resize-none" />
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 mt-5 flex-wrap">
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-bold ${isNew ? 'bg-sand-100 text-ink-600' : joinedCount ? 'bg-leaf-100 text-forest-700' : 'bg-honey-soft text-[#A8691F]'}`}>
+          {isNew ? 'Chưa lưu' : joinedCount ? `🙋 ${joinedCount} học sinh tham gia` : '⚠️ Chưa có học sinh'}
+        </span>
+        <div className="flex items-center gap-3">
+          {savedTick && <span className="text-[12.5px] font-bold text-forest-700">✓ Đã lưu</span>}
+          {isNew && <button onClick={onCancelNew} className="text-[13px] font-bold text-ink-600 px-3 py-2">Huỷ</button>}
+          <button onClick={handleSave} disabled={saving || !id.trim() || !name.trim()}
+            className="bg-gradient-to-br from-leaf-500 to-forest-700 text-white font-bold rounded-xl px-5 py-2.5 text-sm disabled:opacity-50">
+            {saving ? 'Đang lưu...' : isNew ? '🌱 Tạo thử thách' : '💾 Lưu thay đổi'}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
